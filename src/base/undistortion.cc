@@ -672,14 +672,14 @@ Camera UndistortCamera(const UndistortCameraOptions& options,
       const Eigen::Vector2d world_point1 =
           camera.ImageToWorld(Eigen::Vector2d(0.5, y + 0.5));
       const Eigen::Vector2d undistorted_point1 =
-          undistorted_camera.WorldToImage(world_point1);
+          undistorted_camera.WorldToImage(world_point1.homogeneous());
       left_min_x = std::min(left_min_x, undistorted_point1(0));
       left_max_x = std::max(left_max_x, undistorted_point1(0));
       // Right border.
       const Eigen::Vector2d world_point2 =
           camera.ImageToWorld(Eigen::Vector2d(camera.Width() - 0.5, y + 0.5));
       const Eigen::Vector2d undistorted_point2 =
-          undistorted_camera.WorldToImage(world_point2);
+          undistorted_camera.WorldToImage(world_point2.homogeneous());
       right_min_x = std::min(right_min_x, undistorted_point2(0));
       right_max_x = std::max(right_max_x, undistorted_point2(0));
     }
@@ -696,14 +696,14 @@ Camera UndistortCamera(const UndistortCameraOptions& options,
       const Eigen::Vector2d world_point1 =
           camera.ImageToWorld(Eigen::Vector2d(x + 0.5, 0.5));
       const Eigen::Vector2d undistorted_point1 =
-          undistorted_camera.WorldToImage(world_point1);
+          undistorted_camera.WorldToImage(world_point1.homogeneous());
       top_min_y = std::min(top_min_y, undistorted_point1(1));
       top_max_y = std::max(top_max_y, undistorted_point1(1));
       // Bottom border.
       const Eigen::Vector2d world_point2 =
           camera.ImageToWorld(Eigen::Vector2d(x + 0.5, camera.Height() - 0.5));
       const Eigen::Vector2d undistorted_point2 =
-          undistorted_camera.WorldToImage(world_point2);
+          undistorted_camera.WorldToImage(world_point2.homogeneous());
       bottom_min_y = std::min(bottom_min_y, undistorted_point2(1));
       bottom_max_y = std::max(bottom_max_y, undistorted_point2(1));
     }
@@ -802,7 +802,7 @@ void UndistortReconstruction(const UndistortCameraOptions& options,
          ++point2D_idx) {
       auto& point2D = image.Point2D(point2D_idx);
       point2D.SetXY(undistorted_camera.WorldToImage(
-          distorted_camera.ImageToWorld(point2D.XY())));
+          distorted_camera.ImageToWorld(point2D.XY()).homogeneous()));
     }
   }
 }

@@ -120,7 +120,7 @@ class Camera {
   double ImageToWorldThreshold(const double threshold) const;
 
   // Project point from world / infinity to image plane.
-  Eigen::Vector2d WorldToImage(const Eigen::Vector2d& world_point) const;
+  Eigen::Vector2d WorldToImage(const Eigen::Vector3d& world_point) const;
 
   // Rescale camera dimensions and accordingly the focal length and
   // and the principal point.

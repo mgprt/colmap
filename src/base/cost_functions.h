@@ -51,12 +51,11 @@ class BundleAdjustmentCostFunction {
     projection[2] += tvec[2];
 
     // Project to image plane.
-    projection[0] /= projection[2];
-    projection[1] /= projection[2];
+    T u, v;
+    CameraModel::Point3DToWorldPlane(camera_params, projection[0], projection[1], projection[2], &u, &v);
 
     // Distort and transform to pixel space.
-    CameraModel::WorldToImage(camera_params, projection[0], projection[1],
-                              &residuals[0], &residuals[1]);
+    CameraModel::WorldToImage(camera_params, u, v, &residuals[0], &residuals[1]);
 
     // Re-projection error.
     residuals[0] -= T(x_);
