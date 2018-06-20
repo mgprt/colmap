@@ -416,6 +416,17 @@ void PyramidCU::GetFeatureDescriptors()
 		}
 	}
 
+	// Print for debugging
+	std::cout << "Extracted " << _featureNum << " feature descriptors: \n";
+	for (int i = 0; i < _featureNum; ++i) {
+	  std::cout << i << ": ";
+	  for (int j = 0; j < 128; ++j) {
+	    std::cout << _descriptor_buffer[128*i + j] << " ";
+	  }
+	  std::cout << "\n";
+	}
+	std::cout << std::endl;
+
 	if(GlobalUtil::_timingS) ProgramCU::FinishCUDA();
 
 	if(_keypoint_index.size() > 0)
@@ -717,6 +728,18 @@ void PyramidCU::DownloadKeypoints()
 			}
 		}
 	}
+	if (ps - buffer > _featureNum * 4) {
+	  // We read more keypoints than selected previously. Print them.
+	  std::cout << "Extracted features: " << (ps - buffer) / 4 << " instead of " << _featureNum << "\n";
+	  for (int i = 0; i < _featureNum; ++i) {
+	    std::cout << i << ": " << buffer[i*4] << " " << buffer[i*4+1] << " " << buffer[i*4+2] << " " << buffer[i*4+3] << "\n";
+	  }
+	  std::cout << "-----------" << std::endl;
+	  for (int i = _featureNum; i < (ps - buffer) / 4; ++i) {
+	    std::cout << i << ": " << buffer[i*4] << " " << buffer[i*4+1] << " " << buffer[i*4+2] << " " << buffer[i*4+3] << "\n";
+	  }
+	  std::cout << std::endl;
+	}
 
 	//put the feature into their original order for existing keypoint 
 	if(_keypoint_index.size() > 0)
@@ -823,7 +846,7 @@ void PyramidCU::GenerateFeatureList()
             // of level features will not match the absolte number of features.
             if (GlobalUtil::_TruncateMethod && GlobalUtil::_FeatureCountThreshold > 0 && _featureNum > GlobalUtil::_FeatureCountThreshold) {
                 int idx = i * param._dog_level_num + j;
-                _levelFeatureNum[idx] = 0;
+//                _levelFeatureNum[idx] = 0;
                 continue;
             }
 
