@@ -84,6 +84,8 @@ if(COLMAP_FIND_QUIETLY)
     find_package(Glew QUIET)
 
     find_package(Qt5 5.4 QUIET COMPONENTS Core OpenGL Widgets)
+
+    find_package(OpenMP QUIET)
 else()
     find_package(Ceres REQUIRED)
 
@@ -105,6 +107,8 @@ else()
     find_package(Glew REQUIRED)
 
     find_package(Qt5 5.4 REQUIRED COMPONENTS Core OpenGL Widgets)
+
+    find_package(OpenMP REQUIRED)
 endif()
 
 # Set the exported variables.
@@ -150,13 +154,14 @@ set(COLMAP_EXTERNAL_LIBRARIES
     ${Qt5Core_LIBRARIES}
     ${Qt5OpenGL_LIBRARIES}
     ${Qt5Widgets_LIBRARIES}
+    ${OpenMP_CXX_FLAGS}
 )
 
 if(UNIX)
     list(APPEND COLMAP_EXTERNAL_LIBRARIES pthread)
 endif()
 
-set(COLMAP_INTERNAL_LIBRARIES
+set(COLMAP_INTERNAL_LIB_NAMES
     colmap
     flann
     graclus
@@ -170,10 +175,19 @@ set(COLMAP_INTERNAL_LIBRARIES
 
 if(COLMAP_CUDA_ENABLED)
     find_package(CUDA ${COLMAP_CUDA_MIN_VERSION} QUIET)
-    list(APPEND COLMAP_INTERNAL_LIBRARIES colmap_cuda)
     list(APPEND COLMAP_EXTERNAL_LIBRARIES ${CUDA_LIBRARIES})
+    list(APPEND COLMAP_INTERNAL_LIB_NAMES colmap_cuda)
 endif()
 
+set(COLMAP_INTERNAL_LIBRARIES "")
+foreach(LIB_NAME ${COLMAP_INTERNAL_LIB_NAMES})
+    #message(STATUS "Looking for library $
+    find_library(LIB_PATH ${LIB_NAME} PATHS ${COLMAP_LINK_DIRS} NO_DEFAULT_PATH)
+    message(STATUS "Found internal colmap lib ${LIB_NAME} at ${LIB_PATH}")
+    list(APPEND COLMAP_INTERNAL_LIBRARIES ${LIB_PATH})
+    # Need to unset this explicitly, otherwise it will used the cached value
+    unset(LIB_PATH CACHE)
+endforeach()
 set(COLMAP_LIBRARIES
     ${COLMAP_INTERNAL_LIBRARIES}
     ${COLMAP_EXTERNAL_LIBRARIES}
