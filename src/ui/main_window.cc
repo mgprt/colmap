@@ -687,6 +687,10 @@ void MainWindow::Import() {
   thread_control_widget_->StartFunction(
       "Importing...", [this, import_path, edit_project]() {
         const size_t idx = reconstruction_manager_.Read(import_path);
+        // TODO (mgprt):
+        // Is it better to just move the viewpoint to the reconstruction center?
+        // Maybe provide a button for that.
+        reconstruction_manager_.Get(idx).Normalize();
         reconstruction_manager_widget_->Update();
         reconstruction_manager_widget_->SelectReconstruction(idx);
         action_bundle_adjustment_->setEnabled(true);
