@@ -106,6 +106,9 @@ static const int kInvalidCameraModelId = -1;
       const double focal_length, const size_t width, const size_t height);     \
                                                                                \
   template <typename T>                                                        \
+  static void Point3DToImagePlane(                                             \
+      const T* params, const T x, const T y, const T z, T* u, T* v);           \
+  template <typename T>                                                        \
   static void WorldToImage(const T* params, const T u, const T v, T* x, T* y); \
   template <typename T>                                                        \
   static void ImageToWorld(const T* params, const T x, const T y, T* u, T* v); \
@@ -126,7 +129,8 @@ static const int kInvalidCameraModelId = -1;
   CAMERA_MODEL_CASE(OpenCVFisheyeCameraModel)       \
   CAMERA_MODEL_CASE(FullOpenCVCameraModel)          \
   CAMERA_MODEL_CASE(FOVCameraModel)                 \
-  CAMERA_MODEL_CASE(ThinPrismFisheyeCameraModel)
+  CAMERA_MODEL_CASE(ThinPrismFisheyeCameraModel)    \
+  CAMERA_MODEL_CASE(UnifiedCameraModel)
 #endif
 
 #ifndef CAMERA_MODEL_SWITCH_CASES
@@ -349,6 +353,23 @@ struct ThinPrismFisheyeCameraModel
   CAMERA_MODEL_DEFINITIONS(10, "THIN_PRISM_FISHEYE", 12)
 };
 
+// TODO
+//
+// This camera model is described in
+//
+//   "Single View  Point  Omnidirectional Camera  Calibration
+//   from Planar Grids",
+//   C. Mai and P. Rives, ICRA, 2007.
+//
+// Parameter list is expected in the following order:
+//
+//   fx, fy, cx, cy, k1, k2, p1, p2, xi
+//
+struct UnifiedCameraModel
+    : public BaseCameraModel<UnifiedCameraModel> {
+  CAMERA_MODEL_DEFINITIONS(11, "UNIFIED", 9)
+};
+
 // Check whether camera model with given name or identifier exists.
 bool ExistsCameraModelWithName(const std::string& model_name);
 bool ExistsCameraModelWithId(const int model_id);
@@ -433,8 +454,8 @@ bool CameraModelHasBogusParams(const int model_id,
 // @param x, y         Output image coordinates in pixels.
 inline void CameraModelWorldToImage(const int model_id,
                                     const std::vector<double>& params,
-                                    const double u, const double v, double* x,
-                                    double* y);
+                                    const double u, const double v,
+                                    const double w, double* x, double* y);
 
 // Transform image coordinates to world coordinates in camera coordinate system.
 //
@@ -612,6 +633,14 @@ std::vector<double> SimplePinholeCameraModel::InitializeParams(
 }
 
 template <typename T>
+void SimplePinholeCameraModel::Point3DToImagePlane(const T* params, const T x,
+                                                   const T y, const T z, T* u,
+                                                   T* v) {
+  *u = x / z;
+  *v = y / z;
+}
+
+template <typename T>
 void SimplePinholeCameraModel::WorldToImage(const T* params, const T u,
                                             const T v, T* x, T* y) {
   const T f = params[0];
@@ -658,6 +687,14 @@ std::vector<size_t> PinholeCameraModel::InitializeExtraParamsIdxs() {
 std::vector<double> PinholeCameraModel::InitializeParams(
     const double focal_length, const size_t width, const size_t height) {
   return {focal_length, focal_length, width / 2.0, height / 2.0};
+}
+
+template <typename T>
+void PinholeCameraModel::Point3DToImagePlane(const T* params, const T x,
+                                             const T y, const T z, T* u,
+                                             T* v) {
+  *u = x / z;
+  *v = y / z;
 }
 
 template <typename T>
@@ -709,6 +746,14 @@ std::vector<size_t> SimpleRadialCameraModel::InitializeExtraParamsIdxs() {
 std::vector<double> SimpleRadialCameraModel::InitializeParams(
     const double focal_length, const size_t width, const size_t height) {
   return {focal_length, width / 2.0, height / 2.0, 0};
+}
+
+template <typename T>
+void SimpleRadialCameraModel::Point3DToImagePlane(const T* params, const T x,
+                                                  const T y, const T z, T* u,
+                                                  T* v) {
+  *u = x / z;
+  *v = y / z;
 }
 
 template <typename T>
@@ -781,6 +826,14 @@ std::vector<double> RadialCameraModel::InitializeParams(
 }
 
 template <typename T>
+void RadialCameraModel::Point3DToImagePlane(const T* params, const T x,
+                                            const T y, const T z, T* u,
+                                            T* v) {
+  *u = x / z;
+  *v = y / z;
+}
+
+template <typename T>
 void RadialCameraModel::WorldToImage(const T* params, const T u, const T v,
                                      T* x, T* y) {
   const T f = params[0];
@@ -848,6 +901,14 @@ std::vector<size_t> OpenCVCameraModel::InitializeExtraParamsIdxs() {
 std::vector<double> OpenCVCameraModel::InitializeParams(
     const double focal_length, const size_t width, const size_t height) {
   return {focal_length, focal_length, width / 2.0, height / 2.0, 0, 0, 0, 0};
+}
+
+template <typename T>
+void OpenCVCameraModel::Point3DToImagePlane(const T* params, const T x,
+                                            const T y, const T z, T* u,
+                                            T* v) {
+  *u = x / z;
+  *v = y / z;
 }
 
 template <typename T>
@@ -923,6 +984,14 @@ std::vector<size_t> OpenCVFisheyeCameraModel::InitializeExtraParamsIdxs() {
 std::vector<double> OpenCVFisheyeCameraModel::InitializeParams(
     const double focal_length, const size_t width, const size_t height) {
   return {focal_length, focal_length, width / 2.0, height / 2.0, 0, 0, 0, 0};
+}
+
+template <typename T>
+void OpenCVFisheyeCameraModel::Point3DToImagePlane(const T* params, const T x,
+                                                   const T y, const T z, T* u,
+                                                   T* v) {
+  *u = x / z;
+  *v = y / z;
 }
 
 template <typename T>
@@ -1021,6 +1090,14 @@ std::vector<double> FullOpenCVCameraModel::InitializeParams(
 }
 
 template <typename T>
+void FullOpenCVCameraModel::Point3DToImagePlane(const T* params, const T x,
+                                                const T y, const T z, T* u,
+                                                T* v) {
+  *u = x / z;
+  *v = y / z;
+}
+
+template <typename T>
 void FullOpenCVCameraModel::WorldToImage(const T* params, const T u, const T v,
                                          T* x, T* y) {
   const T f1 = params[0];
@@ -1099,6 +1176,14 @@ std::vector<double> FOVCameraModel::InitializeParams(const double focal_length,
                                                      const size_t width,
                                                      const size_t height) {
   return {focal_length, focal_length, width / 2.0, height / 2.0, 1e-2};
+}
+
+template <typename T>
+void FOVCameraModel::Point3DToImagePlane(const T* params, const T x,
+                                         const T y, const T z, T* u,
+                                         T* v) {
+  *u = x / z;
+  *v = y / z;
 }
 
 template <typename T>
@@ -1237,6 +1322,14 @@ std::vector<double> SimpleRadialFisheyeCameraModel::InitializeParams(
 }
 
 template <typename T>
+void SimpleRadialFisheyeCameraModel::Point3DToImagePlane(const T* params, const T x,
+                                                         const T y, const T z, T* u,
+                                                         T* v) {
+  *u = x / z;
+  *v = y / z;
+}
+
+template <typename T>
 void SimpleRadialFisheyeCameraModel::WorldToImage(const T* params, const T u,
                                                   const T v, T* x, T* y) {
   const T f = params[0];
@@ -1310,6 +1403,14 @@ std::vector<size_t> RadialFisheyeCameraModel::InitializeExtraParamsIdxs() {
 std::vector<double> RadialFisheyeCameraModel::InitializeParams(
     const double focal_length, const size_t width, const size_t height) {
   return {focal_length, width / 2.0, height / 2.0, 0, 0};
+}
+
+template <typename T>
+void RadialFisheyeCameraModel::Point3DToImagePlane(const T* params, const T x,
+                                                   const T y, const T z, T* u,
+                                                   T* v) {
+  *u = x / z;
+  *v = y / z;
 }
 
 template <typename T>
@@ -1403,6 +1504,14 @@ std::vector<double> ThinPrismFisheyeCameraModel::InitializeParams(
 }
 
 template <typename T>
+void ThinPrismFisheyeCameraModel::Point3DToImagePlane(const T* params,
+                                                      const T x, const T y,
+                                                      const T z, T* u, T* v) {
+  *u = x / z;
+  *v = y / z;
+}
+
+template <typename T>
 void ThinPrismFisheyeCameraModel::WorldToImage(const T* params, const T u,
                                                const T v, T* x, T* y) {
   const T f1 = params[0];
@@ -1481,14 +1590,126 @@ void ThinPrismFisheyeCameraModel::Distortion(const T* extra_params, const T u,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// UnifiedCameraModel
+
+std::string UnifiedCameraModel::InitializeParamsInfo() {
+  return "fx, fy, cx, cy, k1, k2, p1, p2, xi";
+}
+
+std::vector<size_t> UnifiedCameraModel::InitializeFocalLengthIdxs() {
+  return {0, 1};
+}
+
+std::vector<size_t>
+UnifiedCameraModel::InitializePrincipalPointIdxs() {
+  return {2, 3};
+}
+
+std::vector<size_t> UnifiedCameraModel::InitializeExtraParamsIdxs() {
+  return {4, 5, 6, 7, 8};
+}
+
+std::vector<double> UnifiedCameraModel::InitializeParams(
+    const double focal_length, const size_t width, const size_t height) {
+  return {focal_length,
+          focal_length,
+          width / 2.0,
+          height / 2.0,
+          0,
+          0,
+          0,
+          0,
+          0};
+}
+
+template <typename T>
+void UnifiedCameraModel::Point3DToImagePlane(const T* params, const T x,
+                                             const T y, const T z, T* u,
+                                             T* v) {
+  const T xi = params[8];
+  const T d = ceres::sqrt(x*x + y*y + z*z);
+  const T rz = T(1.0) / (z + (d * xi));
+
+  *u = x * rz;
+  *v = y * rz;
+}
+
+template <typename T>
+void UnifiedCameraModel::WorldToImage(const T* params, const T u,
+                                      const T v, T* x, T* y) {
+  const T f1 = params[0];
+  const T f2 = params[1];
+  const T c1 = params[2];
+  const T c2 = params[3];
+
+  // Distortion
+  T du, dv;
+  Distortion(&params[4], u, v, &du, &dv);
+  *x = u + du;
+  *y = v + dv;
+
+  // Transform to image coordinates
+  *x = f1 * *x + c1;
+  *y = f2 * *y + c2;
+}
+
+template <typename T>
+void UnifiedCameraModel::ImageToWorld(const T* params, const T x,
+                                      const T y, T* u, T* v) {
+  const T f1 = params[0];
+  const T f2 = params[1];
+  const T c1 = params[2];
+  const T c2 = params[3];
+  const T xi = params[8];
+
+  // Lift points to normalized plane
+  *u = (x - c1) / f1;
+  *v = (y - c2) / f2;
+
+  IterativeUndistortion(&params[4], u, v);
+
+  // Compute the unit ray vector that passes through the scene point.
+  double r2 = (*u) * (*u) + (*v) * (*v);
+  double beta = 1.0 + (1.0 - xi * xi) * r2;
+
+
+  T lambda = T((xi + sqrt(beta)) / (1.0 + r2));
+
+  *u = (lambda * (*u)) / (lambda - xi);
+  *v = (lambda * (*v)) / (lambda - xi);
+}
+
+template <typename T>
+void UnifiedCameraModel::Distortion(const T* extra_params, const T u,
+                                    const T v, T* du, T* dv) {
+  const T k1 = extra_params[0];
+  const T k2 = extra_params[1];
+  const T p1 = extra_params[2];
+  const T p2 = extra_params[3];
+
+  const T u2 = u * u;
+  const T uv = u * v;
+  const T v2 = v * v;
+  const T r2 = u2 + v2;
+  const T radial = k1 * r2 + k2 * r2 * r2;
+  *du = u * radial + T(2) * p1 * uv + p2 * (r2 + T(2) * u2);
+  *dv = v * radial + T(2) * p2 * uv + p1 * (r2 + T(2) * v2);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 void CameraModelWorldToImage(const int model_id,
                              const std::vector<double>& params, const double u,
-                             const double v, double* x, double* y) {
+                             const double v, const double w, double* x,
+                             double* y) {
+  double uu;
+  double vv;
+
   switch (model_id) {
-#define CAMERA_MODEL_CASE(CameraModel)                    \
-  case CameraModel::kModelId:                             \
-    CameraModel::WorldToImage(params.data(), u, v, x, y); \
+#define CAMERA_MODEL_CASE(CameraModel)                                  \
+  case CameraModel::kModelId:                                           \
+    CameraModel::Point3DToImagePlane(params.data(), u, v, w, &uu, &vv); \
+    CameraModel::WorldToImage(params.data(), uu, vv, x, y);             \
     break;
 
     CAMERA_MODEL_SWITCH_CASES

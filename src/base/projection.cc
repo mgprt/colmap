@@ -105,7 +105,7 @@ Eigen::Vector2d ProjectPointToImage(const Eigen::Vector3d& point3D,
                                     const Eigen::Matrix3x4d& proj_matrix,
                                     const Camera& camera) {
   const Eigen::Vector3d world_point = proj_matrix * point3D.homogeneous();
-  return camera.WorldToImage(world_point.hnormalized());
+  return camera.WorldToImage(world_point);
 }
 
 double CalculateReprojectionError(const Eigen::Vector2d& point2D,
