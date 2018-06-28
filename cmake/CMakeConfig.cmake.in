@@ -141,10 +141,6 @@ set(COLMAP_LINK_DIRS
 
 set(COLMAP_EXTERNAL_LIBRARIES
     ${CMAKE_DL_LIBS}
-    ${Boost_FILESYSTEM_LIBRARY}
-    ${Boost_PROGRAM_OPTIONS_LIBRARY}
-    ${Boost_REGEX_LIBRARY}
-    ${Boost_SYSTEM_LIBRARY}
     ${GLOG_LIBRARIES}
     ${FREEIMAGE_LIBRARIES}
     ${CERES_LIBRARIES}
@@ -181,9 +177,7 @@ endif()
 
 set(COLMAP_INTERNAL_LIBRARIES "")
 foreach(LIB_NAME ${COLMAP_INTERNAL_LIB_NAMES})
-    #message(STATUS "Looking for library $
     find_library(LIB_PATH ${LIB_NAME} PATHS ${COLMAP_LINK_DIRS} NO_DEFAULT_PATH)
-    message(STATUS "Found internal colmap lib ${LIB_NAME} at ${LIB_PATH}")
     list(APPEND COLMAP_INTERNAL_LIBRARIES ${LIB_PATH})
     # Need to unset this explicitly, otherwise it will used the cached value
     unset(LIB_PATH CACHE)
