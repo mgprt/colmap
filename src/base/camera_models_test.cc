@@ -39,9 +39,10 @@ using namespace colmap;
 template <typename CameraModel>
 void TestWorldToImageToWorld(const std::vector<double> params, const double u0,
                              const double v0) {
-  double u, v, x, y, xx, yy;
-  CameraModel::WorldToImage(params.data(), u0, v0, &x, &y);
-  CameraModelWorldToImage(CameraModel::model_id, params, u0, v0, &xx, &yy);
+  double u, v, ut, vt, x, y, xx, yy;
+  CameraModel::Point3DToImagePlane(params.data(), u0, v0, 1.0, &ut, &vt);
+  CameraModel::WorldToImage(params.data(), ut, vt, &x, &y);
+  CameraModelWorldToImage(CameraModel::model_id, params, u0, v0, 1.0, &xx, &yy);
   BOOST_CHECK_EQUAL(x, xx);
   BOOST_CHECK_EQUAL(y, yy);
   CameraModel::ImageToWorld(params.data(), x, y, &u, &v);
@@ -216,3 +217,5 @@ BOOST_AUTO_TEST_CASE(TestThinPrismFisheye) {
                                 0.001,   0.02,    -0.02,   0.001};
   TestModel<ThinPrismFisheyeCameraModel>(params);
 }
+
+// TODO Add test for unified camera model
