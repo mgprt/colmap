@@ -77,7 +77,7 @@ void WarpImageBetweenCameras(const Camera& source_camera,
       const Eigen::Vector2d world_point =
           scaled_target_camera.ImageToWorld(image_point);
       const Eigen::Vector2d source_point =
-          source_camera.WorldToImage(world_point);
+          source_camera.WorldToImage(world_point.homogeneous());
 
       BitmapColor<float> color;
       if (source_image.InterpolateBilinear(source_point.x() - 0.5,
@@ -153,7 +153,7 @@ void WarpImageWithHomographyBetweenCameras(const Eigen::Matrix3d& H,
       const Eigen::Vector2d world_point =
           target_camera.ImageToWorld(warped_point.hnormalized());
       const Eigen::Vector2d source_point =
-          source_camera.WorldToImage(world_point);
+          source_camera.WorldToImage(world_point.homogeneous());
 
       BitmapColor<float> color;
       if (source_image.InterpolateBilinear(source_point.x() - 0.5,
