@@ -517,7 +517,7 @@ int RunImageRegistrator(int argc, char** argv) {
         static_cast<size_t>(options.mapper->min_num_matches);
     database_cache.Load(database, min_num_matches,
                         options.mapper->ignore_watermarks,
-                        options.mapper->image_names);
+                        options.mapper->image_names, true);
     std::cout << std::endl;
     timer.PrintMinutes();
   }
@@ -1088,7 +1088,7 @@ int RunPointTriangulator(int argc, char** argv) {
         static_cast<size_t>(mapper_options.min_num_matches);
     database_cache.Load(database, min_num_matches,
                         mapper_options.ignore_watermarks,
-                        mapper_options.image_names);
+                        mapper_options.image_names, true);
     std::cout << std::endl;
     timer.PrintMinutes();
   }

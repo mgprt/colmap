@@ -84,9 +84,10 @@ class SceneGraph {
   //
   // - Calculates the number of observations per image by counting the number
   //   of image points that have at least one correspondence.
-  // - Deletes images without observations, as they are useless for SfM.
+  // - If remove_disconnected is `true', removes images without observations,
+  //   as they are useless for SfM.
   // - Shrinks the correspondence vectors to their size to save memory.
-  void Finalize();
+  void Finalize(const bool remove_disconnected);
 
   // Add new image to the scene graph.
   void AddImage(const image_t image_id, const size_t num_points2D);

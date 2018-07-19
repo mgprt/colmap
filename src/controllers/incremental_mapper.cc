@@ -340,7 +340,7 @@ bool IncrementalMapperController::LoadDatabase() {
   timer.Start();
   const size_t min_num_matches = static_cast<size_t>(options_->min_num_matches);
   database_cache_.Load(database, min_num_matches, options_->ignore_watermarks,
-                       options_->image_names);
+                       options_->image_names, true);
   std::cout << std::endl;
   timer.PrintMinutes();
 

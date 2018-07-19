@@ -54,7 +54,8 @@ void DatabaseCache::AddImage(const class Image& image) {
 
 void DatabaseCache::Load(const Database& database, const size_t min_num_matches,
                          const bool ignore_watermarks,
-                         const std::set<std::string>& image_names) {
+                         const std::set<std::string>& image_names,
+                         const bool ignore_disconnected) {
   //////////////////////////////////////////////////////////////////////////////
   // Load cameras
   //////////////////////////////////////////////////////////////////////////////
@@ -144,7 +145,8 @@ void DatabaseCache::Load(const Database& database, const size_t min_num_matches,
     images_.reserve(connected_image_ids.size());
     for (const auto& image : images) {
       if (image_ids.count(image.ImageId()) > 0 &&
-          connected_image_ids.count(image.ImageId()) > 0) {
+          (!ignore_disconnected ||
+              connected_image_ids.count(image.ImageId()) > 0)) {
         images_.emplace(image.ImageId(), image);
         const FeatureKeypoints keypoints =
             database.ReadKeypoints(image.ImageId());
@@ -188,7 +190,7 @@ void DatabaseCache::Load(const Database& database, const size_t min_num_matches,
     }
   }
 
-  scene_graph_.Finalize();
+  scene_graph_.Finalize(ignore_disconnected);
 
   // Set number of observations and correspondences per image.
   for (auto& image : images_) {

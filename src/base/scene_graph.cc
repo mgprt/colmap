@@ -39,7 +39,7 @@ namespace colmap {
 
 SceneGraph::SceneGraph() {}
 
-void SceneGraph::Finalize() {
+void SceneGraph::Finalize(const bool remove_disconnected) {
   for (auto it = images_.begin(); it != images_.end();) {
     it->second.num_observations = 0;
     for (auto& corr : it->second.corrs) {
@@ -48,7 +48,8 @@ void SceneGraph::Finalize() {
         it->second.num_observations += 1;
       }
     }
-    if (it->second.num_observations == 0) {
+
+    if (remove_disconnected && it->second.num_observations == 0) {
       images_.erase(it++);
     } else {
       ++it;

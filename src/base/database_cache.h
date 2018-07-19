@@ -88,9 +88,12 @@ class DatabaseCache {
   // @param ignore_watermarks     Whether to ignore watermark image pairs.
   // @param image_names           Whether to use only load the data for a subset
   //                              of the images. All images are used if empty.
+  // @param ignore_disconnected   Whether to ignore disconnected images in the
+  //                              database to reduce memory usage.
   void Load(const Database& database, const size_t min_num_matches,
             const bool ignore_watermarks,
-            const std::set<std::string>& image_names);
+            const std::set<std::string>& image_names,
+            const bool ignore_disconnected);
 
  private:
   class SceneGraph scene_graph_;

@@ -145,7 +145,7 @@ BOOST_AUTO_TEST_CASE(TestTwoView) {
     BOOST_CHECK_EQUAL(matches[i].point2D_idx1, corrs01[i].first);
     BOOST_CHECK_EQUAL(matches[i].point2D_idx2, corrs01[i].second);
   }
-  scene_graph.Finalize();
+  scene_graph.Finalize(true);
   BOOST_CHECK_EQUAL(scene_graph.NumObservationsForImage(0), 4);
   BOOST_CHECK_EQUAL(scene_graph.NumObservationsForImage(1), 4);
   BOOST_CHECK_EQUAL(scene_graph.NumCorrespondencesForImage(0), 4);
@@ -263,7 +263,7 @@ BOOST_AUTO_TEST_CASE(TestThreeView) {
                     2);
   BOOST_CHECK_EQUAL(scene_graph.FindTransitiveCorrespondences(2, 0, 3).size(),
                     2);
-  scene_graph.Finalize();
+  scene_graph.Finalize(true);
   BOOST_CHECK_EQUAL(scene_graph.NumObservationsForImage(0), 1);
   BOOST_CHECK_EQUAL(scene_graph.NumObservationsForImage(1), 2);
   BOOST_CHECK_EQUAL(scene_graph.NumObservationsForImage(2), 2);
@@ -276,7 +276,13 @@ BOOST_AUTO_TEST_CASE(TestThreeView) {
   BOOST_CHECK_EQUAL(scene_graph.ExistsImage(2), true);
   BOOST_CHECK_EQUAL(scene_graph.ExistsImage(3), true);
   BOOST_CHECK_EQUAL(scene_graph.NumImages(), 4);
-  scene_graph.Finalize();
+  scene_graph.Finalize(false);
+  BOOST_CHECK_EQUAL(scene_graph.ExistsImage(0), true);
+  BOOST_CHECK_EQUAL(scene_graph.ExistsImage(1), true);
+  BOOST_CHECK_EQUAL(scene_graph.ExistsImage(2), true);
+  BOOST_CHECK_EQUAL(scene_graph.ExistsImage(3), true);
+  BOOST_CHECK_EQUAL(scene_graph.NumImages(), 4);
+  scene_graph.Finalize(true);
   BOOST_CHECK_EQUAL(scene_graph.ExistsImage(0), true);
   BOOST_CHECK_EQUAL(scene_graph.ExistsImage(1), true);
   BOOST_CHECK_EQUAL(scene_graph.ExistsImage(2), true);
