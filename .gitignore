@@ -11,6 +11,7 @@ install-debug/
 install-release/
 data/
 doc/_build
+cmake-build*/
 
 # Compiled Object files
 *.slo
