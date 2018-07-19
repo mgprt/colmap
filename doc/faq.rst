@@ -113,10 +113,10 @@ from the known camera poses, you can compute a dense model as follows::
         --input_path path/to/triangulated/sparse/model \
         --output_path path/to/dense/workspace
 
-    colmap dense_stereo \
+    colmap patch_match_stereo \
         --workspace_path path/to/dense/workspace
 
-    colmap dense_fuser \
+    colmap stereo_fusion \
         --workspace_path path/to/dense/workspace \
         --output_path path/to/dense/workspace/fused.ply
 
@@ -132,12 +132,12 @@ during the dense stereo stage, you have to manually specify the source images,
 as described :ref:`here <faq-dense-manual-source>`. The dense stereo stage
 now also requires a manual specification of the depth range::
 
-    colmap dense_stereo \
+    colmap patch_match_stereo \
         --workspace_path path/to/dense/workspace \
         --DenseStereo.depth_min $MIN_DEPTH \
         --DenseStereo.depth_max $MAX_DEPTH
 
-    colmap dense_fuser \
+    colmap stereo_fusion \
         --workspace_path path/to/dense/workspace \
         --output_path path/to/dense/workspace/fused.ply
 
@@ -306,11 +306,11 @@ Trading off completeness and accuracy in dense reconstruction
 If the dense point cloud contains too many outliers and too much noise, try to
 increase the value of option ``--DenseFusion.min_num_pixels``.
 
-If the reconstructed dense surface mesh model contains no surface or there are
-too many outlier surfaces, you should reduce the value of option
-``--DenseMeshing.trim`` to decrease the surface are and vice versa to increase
-it. Also consider to try the reduce the outliers or increase the completeness in
-the fusion stage, as described above.
+If the reconstructed dense surface mesh model using Poisson reconstruction
+contains no surface or there are too many outlier surfaces, you should reduce
+the value of option ``--DenseMeshing.trim`` to decrease the surface are and vice
+versa to increase it. Also consider to try the reduce the outliers or increase
+the completeness in the fusion stage, as described above.
 
 
 Improving dense reconstruction results for weakly textured surfaces
@@ -321,6 +321,25 @@ of the input images (``--DenseStereo.max_image_size``) and a large patch window
 radius (``--DenseStereo.window_radius``). You may also want to reduce the
 filtering threshold for the photometric consistency cost
 (``--DenseStereo.filter_min_ncc``).
+
+
+Surface mesh reconstruction
+---------------------------
+
+COLMAP supports two types of surface reconstruction algorithms. Poisson surface
+reconstruction [kazhdan2013]_ and graph-cut based surface extraction from a
+Delaunay triangulation. Poisson surface reconstruction typically requires an
+outlier-free input point cloud and it often produces bad surfaces in the
+presence of outliers or large holes in the input data. The Delaunay
+triangulation based meshing algorithm is robust to outliers and in general more
+scalable to large datasets than the Poisson algorithm, but it usually produces
+less smooth surfaces. Furthermore, the Delaunay based meshing can be applied to
+sparse and dense reconstruction results.
+
+Note that the two algorithms can also be combined by first running the Delaunay
+meshing to robustly filter outliers from the sparse or dense point cloud and
+then, in the second step, performing Poisson surface reconstruction to obtain a
+smooth surface.
 
 
 Speedup dense reconstruction
@@ -385,13 +404,15 @@ images using e.g. CMVS [furukawa10]_. In addition, CMVS allows to prune
 redundant images observing the same scene elements. Note that, for this use
 case, COLMAP's dense reconstruction pipeline also supports the PMVS/CMVS folder
 structure when executed from the command-line. Please, refer to the workspace
-folder for example shell scripts. Since CMVS produces highly overlapping
-clusters, it is recommended to increase the default value of 100 images per
-cluster to as high as possible according to your available system resources and
-speed requirements. To change the number of images using CMVS, you must modify
-the shell scripts accordingly. For example, ``cmvs pmvs/ 500`` to limit each
-cluster to 500 images. If you want to use CMVS to prune redundant images but not
-to cluster the scene, you can simply set this number to a very large value.
+folder for example shell scripts. Note that the example shell scripts for
+PMVS/CMVS are only generated, if the output type is set to PMVS. Since CMVS
+produces highly overlapping clusters, it is recommended to increase the default
+value of 100 images per cluster to as high as possible according to your
+available system resources and speed requirements. To change the number of
+images using CMVS, you must modify the shell scripts accordingly. For example,
+``cmvs pmvs/ 500`` to limit each cluster to 500 images. If you want to use CMVS
+to prune redundant images but not to cluster the scene, you can simply set this
+number to a very large value.
 
 
 .. _faq-dense-manual-source:
@@ -470,7 +491,7 @@ command-line. Under Ubuntu, you could first stop X using::
 
 And then run the dense reconstruction code from the command-line::
 
-    colmap dense_stereo ...
+    colmap patch_match_stereo ...
 
 Finally, you can restart your desktop environment with the following command::
 
