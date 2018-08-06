@@ -88,7 +88,7 @@ LORANSAC<Estimator, LocalEstimator, SupportMeasurer, Sampler>::LORANSAC(
 
 template <typename Estimator, typename LocalEstimator, typename SupportMeasurer,
           typename Sampler>
-typename LORANSAC<Estimator, LocalEstimator, SupportMeasurer, Sampler>::Report
+typename RANSAC<Estimator, SupportMeasurer, Sampler>::Report
 LORANSAC<Estimator, LocalEstimator, SupportMeasurer, Sampler>::Estimate(
     const std::vector<typename Estimator::X_t>& X,
     const std::vector<typename Estimator::Y_t>& Y) {
