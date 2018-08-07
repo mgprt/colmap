@@ -53,17 +53,18 @@ template <typename Estimator, typename LocalEstimator,
           typename Sampler = RandomSampler>
 class LORANSAC : public RANSAC<Estimator, SupportMeasurer, Sampler> {
  public:
-  using typename RANSAC<Estimator, SupportMeasurer, Sampler>::Report;
+//  using typename RANSAC<Estimator, SupportMeasurer, Sampler>::Report;
 
   explicit LORANSAC(const RANSACOptions& options);
 
+  using RANSAC<Estimator, SupportMeasurer, Sampler>::Estimate;
   // Robustly estimate model with RANSAC (RANdom SAmple Consensus).
   //
   // @param X              Independent variables.
   // @param Y              Dependent variables.
   //
   // @return               The report with the results of the estimation.
-  Report Estimate(const std::vector<typename Estimator::X_t>& X,
+  typename RANSAC<Estimator, SupportMeasurer, Sampler>::Report Estimate(const std::vector<typename Estimator::X_t>& X,
                   const std::vector<typename Estimator::Y_t>& Y);
 
   // Objects used in RANSAC procedure.
