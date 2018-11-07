@@ -51,7 +51,7 @@ of commands as an alternative to the automatic reconstruction command::
     $ colmap mapper \
         --database_path $DATASET_PATH/database.db \
         --image_path $DATASET_PATH/images \
-        --export_path $DATASET_PATH/sparse
+        --output_path $DATASET_PATH/sparse
 
     $ mkdir $DATASET_PATH/dense
 
@@ -65,7 +65,7 @@ of commands as an alternative to the automatic reconstruction command::
     $ colmap patch_match_stereo \
         --workspace_path $DATASET_PATH/dense \
         --workspace_format COLMAP \
-        --DenseStereo.geom_consistency true
+        --PatchMatchStereo.geom_consistency true
 
     $ colmap stereo_fusion \
         --workspace_path $DATASET_PATH/dense \
@@ -74,7 +74,7 @@ of commands as an alternative to the automatic reconstruction command::
         --output_path $DATASET_PATH/dense/fused.ply
 
     $ colmap poisson_mesher \
-        --input_path $DATASET_PATH/dense/ \
+        --input_path $DATASET_PATH/dense/fused.ply \
         --output_path $DATASET_PATH/dense/meshed-poisson.ply
 
     $ colmap delaunay_mesher \
@@ -108,7 +108,7 @@ The available commands can be listed using the command::
           colmap automatic_reconstructor --image_path IMAGES --workspace_path WORKSPACE
           colmap feature_extractor --image_path IMAGES --database_path DATABASE
           colmap exhaustive_matcher --database_path DATABASE
-          colmap mapper --image_path IMAGES --database_path DATABASE --export_path EXPORT
+          colmap mapper --image_path IMAGES --database_path DATABASE --output_path MODEL
           ...
 
         Available commands:
@@ -122,6 +122,7 @@ The available commands can be listed using the command::
           exhaustive_matcher
           feature_extractor
           feature_importer
+          image_deleter
           image_rectifier
           image_registrator
           image_undistorter
@@ -220,10 +221,13 @@ available as ``colmap [command]``:
 - ``image_rectifier``: Stereo rectify cameras and undistort images for stereo
   disparity estimation.
 
-- ``patch_match_stereo``: Dense 3D reconstruction / mapping using MVS after running
-  the ``image_undistorter`` to initialize the workspace.
+- ``image_deleter``: Delete individual images from a sparse reconstruction.
 
-- ``stereo_fusion``: Fusion of MVS depth and normal maps to a colored point cloud.
+- ``patch_match_stereo``: Dense 3D reconstruction / mapping using MVS after
+  running the ``image_undistorter`` to initialize the workspace.
+
+- ``stereo_fusion``: Fusion of ``patch_match_stereo`` results into to a colored
+  point cloud.
 
 - ``poisson_mesher``: Meshing of the fused point cloud using Poisson
   surface reconstruction.

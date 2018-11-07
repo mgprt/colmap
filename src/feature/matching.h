@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #ifndef COLMAP_SRC_FEATURE_MATCHING_H_
 #define COLMAP_SRC_FEATURE_MATCHING_H_
@@ -55,7 +55,7 @@ struct ExhaustiveMatchingOptions {
 
 struct SequentialMatchingOptions {
   // Number of overlapping image pairs.
-  int overlap = 5;
+  int overlap = 10;
 
   // Whether to match images against their quadratic neighbors.
   bool quadratic_overlap = true;
@@ -68,7 +68,7 @@ struct SequentialMatchingOptions {
 
   // The number of images to retrieve in loop detection. This number should
   // be significantly bigger than the sequential matching overlap.
-  int loop_detection_num_images = 30;
+  int loop_detection_num_images = 50;
 
   // Number of nearest neighbors to retrieve per query feature.
   int loop_detection_num_nearest_neighbors = 1;

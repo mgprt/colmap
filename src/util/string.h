@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #ifndef COLMAP_SRC_UTIL_STRING_H_
 #define COLMAP_SRC_UTIL_STRING_H_
@@ -45,6 +45,9 @@ std::string StringPrintf(const char* format, ...);
 // Replace all occurrences of `old_str` with `new_str` in the given string.
 std::string StringReplace(const std::string& str, const std::string& old_str,
                           const std::string& new_str);
+
+// Get substring of string after search key
+std::string StringGetAfter(const std::string& str, const std::string& key);
 
 // Split string into list of words using the given delimiters.
 std::vector<std::string> StringSplit(const std::string& str,

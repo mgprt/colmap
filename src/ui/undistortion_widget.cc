@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #include "ui/undistortion_widget.h"
 
@@ -48,8 +48,7 @@ UndistortionWidget::UndistortionWidget(QWidget* parent,
   output_format_->addItem("PMVS");
   output_format_->addItem("CMP-MVS");
   output_format_->setFont(font());
-
-  AddOptionRow("format", output_format_);
+  AddWidgetRow("format", output_format_);
 
   UndistortCameraOptions default_options;
 

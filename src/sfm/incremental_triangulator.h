@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #ifndef COLMAP_SRC_SFM_INCREMENTAL_TRIANGULATOR_H_
 #define COLMAP_SRC_SFM_INCREMENTAL_TRIANGULATOR_H_
@@ -151,7 +151,6 @@ class IncrementalTriangulator {
     const Image* image;
     const Camera* camera;
     const Point2D* point2D;
-    Eigen::Matrix3x4d proj_matrix;
   };
 
  private:

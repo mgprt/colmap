@@ -27,7 +27,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-# Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+# Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 import os
 import sys
@@ -138,7 +138,10 @@ def parse_args():
         args.cmake_config_args.extend(["-G", args.cmake_generator])
     if PLATFORM_IS_WINDOWS:
         args.cmake_config_args.append(
-            "-DCMAKE_GENERATOR_PLATFORM=x64")
+            "-DCMAKE_GENERATOR_TOOLSET='host=x64'")
+        if "Win64" not in args.cmake_generator:
+            args.cmake_config_args.append(
+                "-DCMAKE_GENERATOR_PLATFORM=x64")
 
     args.cmake_build_args = ["--"]
     if PLATFORM_IS_WINDOWS:
@@ -218,10 +221,10 @@ def build_eigen(args):
     if os.path.exists(path):
         return
 
-    url = "https://bitbucket.org/eigen/eigen/get/3.3.4.zip"
-    archive_path = os.path.join(args.download_path, "eigen-3.3.4.zip")
+    url = "https://bitbucket.org/eigen/eigen/get/3.3.5.zip"
+    archive_path = os.path.join(args.download_path, "eigen-3.3.5.zip")
     download_zipfile(url, archive_path, args.build_path,
-                     "e337acc279874bc6a56da4d973a723fb")
+                     "2a3e158738a4dc02f44c3fbb73d58ad7")
     shutil.move(glob.glob(os.path.join(args.build_path, "eigen-*"))[0], path)
 
     build_cmake_project(args, os.path.join(path, "__build__"))
@@ -234,10 +237,10 @@ def build_freeimage(args):
 
     if PLATFORM_IS_WINDOWS:
         url = "https://kent.dl.sourceforge.net/project/freeimage/" \
-              "Binary%20Distribution/3.17.0/FreeImage3170Win32Win64.zip"
-        archive_path = os.path.join(args.download_path, "freeimage-3.17.0.zip")
+              "Binary%20Distribution/3.18.0/FreeImage3180Win32Win64.zip"
+        archive_path = os.path.join(args.download_path, "freeimage-3.18.0.zip")
         download_zipfile(url, archive_path, args.build_path,
-                         "a7e6f2f261e72260ec5b91c2a0f4bde3")
+                         "393d3df75b14cbcb4887da1c395596e2")
         shutil.move(os.path.join(args.build_path, "FreeImage"), path)
         copy_file_if_not_exists(
             os.path.join(path, "Dist/x64/FreeImage.h"),
@@ -250,10 +253,10 @@ def build_freeimage(args):
             os.path.join(args.install_path, "lib/FreeImage.dll"))
     else:
         url = "https://kent.dl.sourceforge.net/project/freeimage/" \
-              "Source%20Distribution/3.17.0/FreeImage3170.zip"
-        archive_path = os.path.join(args.download_path, "freeimage-3.17.0.zip")
+              "Source%20Distribution/3.18.0/FreeImage3180.zip"
+        archive_path = os.path.join(args.download_path, "freeimage-3.18.0.zip")
         download_zipfile(url, archive_path, args.build_path,
-                         "459e15f0ec75d6efa3c7bd63277ead86")
+                         "f8ba138a3be233a3eed9c456e42e2578")
         shutil.move(os.path.join(args.build_path, "FreeImage"), path)
 
         if PLATFORM_IS_MAC:
@@ -367,11 +370,14 @@ def build_suite_sparse(args):
     build_cmake_project(args, os.path.join(path, "__build__"))
 
     if PLATFORM_IS_WINDOWS:
-        lapack_blas_path = os.path.join(args.install_path,
-                                        "lib64/lapack_blas_windows/*.dll")
+        lapack_blas_path = os.path.join(path, "lapack_windows/x64/*")
+        mkdir_if_not_exists(os.path.join(args.install_path, "lib64"))
+        mkdir_if_not_exists(os.path.join(args.install_path,
+                                         "lib64/lapack_blas_windows"))
         for library_path in glob.glob(lapack_blas_path):
             copy_file_if_not_exists(
-                library_path, os.path.join(args.install_path, "lib",
+                library_path, os.path.join(args.install_path,
+                                           "lib64/lapack_blas_windows",
                                            os.path.basename(library_path)))
 
 
@@ -492,9 +498,10 @@ def build_post_process(args):
                     gmp_lib_path,
                     os.path.join(args.install_path, "lib/libgmp-10.dll"))
             copy_file_if_not_exists(
-                os.path.join(args.cgal_path,
-                             "bin/Release/CGAL-vc140-mt-4.11.2.dll"),
-                os.path.join(args.install_path, "lib/CGAL-vc140-mt-4.11.2.dll"))
+                glob.glob(os.path.join(
+                    args.cgal_path,
+                    "build/bin/Release/CGAL-vc140-mt-*.dll"))[0],
+                os.path.join(args.install_path, "lib"))
 
 
 def main():

@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #include "util/option_manager.h"
 
@@ -79,6 +79,8 @@ OptionManager::OptionManager() {
 }
 
 void OptionManager::ModifyForIndividualData() {
+  mapper->min_focal_length_ratio = 0.1;
+  mapper->max_focal_length_ratio = 10;
   mapper->max_extra_param = std::numeric_limits<double>::max();
 }
 
@@ -88,6 +90,8 @@ void OptionManager::ModifyForVideoData() {
   mapper->mapper.init_min_tri_angle /= 2;
   mapper->ba_global_images_ratio = 1.4;
   mapper->ba_global_points_ratio = 1.4;
+  mapper->min_focal_length_ratio = 0.1;
+  mapper->max_focal_length_ratio = 10;
   mapper->max_extra_param = std::numeric_limits<double>::max();
   stereo_fusion->min_num_pixels = 15;
 }
@@ -135,13 +139,24 @@ void OptionManager::ModifyForMediumQuality() {
 }
 
 void OptionManager::ModifyForHighQuality() {
+  sift_extraction->estimate_affine_shape = true;
   sift_extraction->max_image_size = 2400;
+  sift_matching->guided_matching = true;
+  mapper->ba_local_max_num_iterations = 30;
+  mapper->ba_local_max_refinements = 3;
+  mapper->ba_global_max_num_iterations = 75;
   patch_match_stereo->max_image_size = 2400;
   stereo_fusion->max_image_size = 2400;
 }
 
 void OptionManager::ModifyForExtremeQuality() {
-  // Extreme quality is the default.
+  // Most of the options are set to extreme quality by default.
+  sift_extraction->estimate_affine_shape = true;
+  sift_extraction->domain_size_pooling = true;
+  sift_matching->guided_matching = true;
+  mapper->ba_local_max_num_iterations = 40;
+  mapper->ba_local_max_refinements = 3;
+  mapper->ba_global_max_num_iterations = 100;
 }
 
 void OptionManager::AddAllOptions() {
@@ -411,6 +426,8 @@ void OptionManager::AddBundleAdjustmentOptions() {
                               &bundle_adjustment->refine_principal_point);
   AddAndRegisterDefaultOption("BundleAdjustment.refine_extra_params",
                               &bundle_adjustment->refine_extra_params);
+  AddAndRegisterDefaultOption("BundleAdjustment.refine_extrinsics",
+                              &bundle_adjustment->refine_extrinsics);
 }
 
 void OptionManager::AddMapperOptions() {

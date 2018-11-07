@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "util/misc"
 #include "util/testing.h"
@@ -188,4 +188,36 @@ BOOST_AUTO_TEST_CASE(TestVectorToCSV) {
   BOOST_CHECK_EQUAL(VectorToCSV<int>({}), "");
   BOOST_CHECK_EQUAL(VectorToCSV<int>({1}), "1");
   BOOST_CHECK_EQUAL(VectorToCSV<int>({1, 2, 3}), "1, 2, 3");
+}
+
+BOOST_AUTO_TEST_CASE(TestRemoveCommandLineArgument) {
+  int argc = 3;
+  std::unique_ptr<char[]> arg1(new char[4]);
+  memcpy(arg1.get(), "abc", 4 * sizeof(char));
+  std::unique_ptr<char[]> arg2(new char[4]);
+  memcpy(arg2.get(), "def", 4 * sizeof(char));
+  std::unique_ptr<char[]> arg3(new char[4]);
+  memcpy(arg3.get(), "ghi", 4 * sizeof(char));
+  std::vector<char*> argv = {arg1.get(), arg2.get(), arg3.get()};
+
+  RemoveCommandLineArgument("abcd", &argc, argv.data());
+  BOOST_CHECK_EQUAL(argc, 3);
+  BOOST_CHECK_EQUAL(argv[0], "abc");
+  BOOST_CHECK_EQUAL(argv[1], "def");
+  BOOST_CHECK_EQUAL(argv[2], "ghi");
+
+  RemoveCommandLineArgument("def", &argc, argv.data());
+  BOOST_CHECK_EQUAL(argc, 2);
+  BOOST_CHECK_EQUAL(argv[0], "abc");
+  BOOST_CHECK_EQUAL(argv[1], "ghi");
+
+  RemoveCommandLineArgument("ghi", &argc, argv.data());
+  BOOST_CHECK_EQUAL(argc, 1);
+  BOOST_CHECK_EQUAL(argv[0], "abc");
+
+  RemoveCommandLineArgument("abc", &argc, argv.data());
+  BOOST_CHECK_EQUAL(argc, 0);
+
+  RemoveCommandLineArgument("abc", &argc, argv.data());
+  BOOST_CHECK_EQUAL(argc, 0);
 }

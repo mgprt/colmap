@@ -1,6 +1,19 @@
 Frequently Asked Questions
 ==========================
 
+Adjusting the options for different reconstruction scenarios and output quality
+-------------------------------------------------------------------------------
+
+COLMAP provides many options that can be tuned for different reconstruction
+scenarios and to trade off accuracy and completeness versus efficiency. The
+default options are set to for medium to high quality reconstruction of
+unstructured input data. There are several presets for different scenarios and
+quality levels, which can be set in the GUI as ``Extras > Set options for ...``.
+To use these presets from the command-line, you can save the current set of
+options as ``File > Save project`` after choosing the presets. The resulting
+project file can be opened with a text editor to view the different options.
+
+
 Extending COLMAP
 ----------------
 
@@ -83,17 +96,26 @@ Reconstruct sparse/dense model from known camera poses
 ------------------------------------------------------
 
 If the camera poses are known and you want to reconstruct a sparse or dense
-model of the scene, you must first manually construct a sparse model by
-creating a ``cameras.txt`` and ``images.txt`` file. The ``points3D.txt`` file
-can be empty and you can refer to :ref:`this article <output-format>` for more
-information about the structure of a sparse model.
+model of the scene, you must first manually construct a sparse model by creating
+a ``cameras.txt`` and ``images.txt`` file. The ``points3D.txt`` file should be
+empty while every other line in the ``images.txt`` should also be empty, since
+the sparse features are computed, as described below. You can refer to
+:ref:`this article <output-format>` for more information about the structure of
+a sparse model.
 
-To reconstruct a sparse model, you would have to recompute features from the
+To reconstruct a sparse model, you first have to recompute features from the
 images of the known camera poses as follows::
 
     colmap feature_extractor \
         --database_path $PROJECT_PATH/database.db \
         --image_path $PROJECT_PATH/images
+
+If your known camera intrinsics have large distortion coefficients, you should
+now manually copy the parameters from your ``cameras.txt`` to the database, such
+that the matcher can leverage the intrinsics. Modifying the database is possible
+in many ways, but an easy option is to use the provided
+``scripts/python/database.py`` script. Otherwise, you can skip this step and
+simply continue as follows::
 
     colmap exhaustive_matcher \ # or alternatively any other matcher
         --database_path $PROJECT_PATH/database.db
@@ -101,8 +123,8 @@ images of the known camera poses as follows::
     colmap point_triangulator \
         --database_path $PROJECT_PATH/database.db \
         --image_path $PROJECT_PATH/images
-        --import_path path/to/manually/created/sparse/model \
-        --export_path path/to/triangulated/sparse/model
+        --input_path path/to/manually/created/sparse/model \
+        --output_path path/to/triangulated/sparse/model
 
 Note that the sparse reconstruction step is not necessary in order to compute
 a dense model from known camera poses. Assuming you computed a sparse model
@@ -218,8 +240,8 @@ new images within this reconstruction, you can follow these steps::
     colmap image_registrator \
         --database_path $PROJECT_PATH/database.db \
         --image_path $PROJECT_PATH/images \
-        --import_path /path/to/existing-model \
-        --export_path /path/to/model-with-new-images
+        --input_path /path/to/existing-model \
+        --output_path /path/to/model-with-new-images
 
     colmap bundle_adjuster \
         --input_path /path/to/model-with-new-images \
@@ -239,15 +261,15 @@ reconstruction process from the existing model::
     colmap mapper \
         --database_path $PROJECT_PATH/database.db \
         --image_path $PROJECT_PATH/images \
-        --import_path /path/to/existing-model \
-        --export_path /path/to/model-with-new-images
+        --input_path /path/to/existing-model \
+        --output_path /path/to/model-with-new-images
 
 Or, alternatively, you can start the reconstruction from scratch::
 
     colmap mapper \
         --database_path $PROJECT_PATH/database.db \
         --image_path $PROJECT_PATH/images \
-        --export_path /path/to/model-with-new-images
+        --output_path /path/to/model-with-new-images
 
 Note that dense reconstruction must be re-run from scratch after running the
 ``mapper`` or the ``bundle_adjuster``, as the coordinate frame of the model can
@@ -297,20 +319,32 @@ during feature matching, your GPU runs out of memory. Try decreasing the option
 might lead to inferior feature matching results, since the lower-scale input
 features will be clamped in order to fit them into GPU memory. Alternatively,
 you could change to CPU-based feature matching, but this can become very slow,
-or you use a GPU with more memory.
+or better you buy a GPU with more memory.
+
+The maximum required GPU memory can be approximately estimated using the
+following formula: ``4 * num_matches * num_matches + 4 * num_matches * 256``.
+For example, if you set ``--SiftMatching.max_num_matches 10000``, the maximum
+required GPU memory will be around 400MB, which are only allocated if one of
+your images actually has that many features.
 
 
 Trading off completeness and accuracy in dense reconstruction
 -------------------------------------------------------------
 
 If the dense point cloud contains too many outliers and too much noise, try to
-increase the value of option ``--DenseFusion.min_num_pixels``.
+increase the value of option ``--StereoFusion.min_num_pixels``.
 
 If the reconstructed dense surface mesh model using Poisson reconstruction
 contains no surface or there are too many outlier surfaces, you should reduce
-the value of option ``--DenseMeshing.trim`` to decrease the surface are and vice
-versa to increase it. Also consider to try the reduce the outliers or increase
-the completeness in the fusion stage, as described above.
+the value of option ``--PoissonMeshing.trim`` to decrease the surface are and
+vice versa to increase it. Also consider to try the reduce the outliers or
+increase the completeness in the fusion stage, as described above.
+
+If the reconstructed dense surface mesh model using Delaunay reconstruction
+contains too noisy or incomplete surfaces, you should increase the
+``--DenaunayMeshing.quality_regularization`` parameter to obtain a smoother
+surface. If the resolution of the mesh is too coarse, you should reduce the
+``--DelaunayMeshing.max_proj_dist`` option to a lower value.
 
 
 Improving dense reconstruction results for weakly textured surfaces
@@ -329,12 +363,14 @@ Surface mesh reconstruction
 COLMAP supports two types of surface reconstruction algorithms. Poisson surface
 reconstruction [kazhdan2013]_ and graph-cut based surface extraction from a
 Delaunay triangulation. Poisson surface reconstruction typically requires an
-outlier-free input point cloud and it often produces bad surfaces in the
+almost outlier-free input point cloud and it often produces bad surfaces in the
 presence of outliers or large holes in the input data. The Delaunay
-triangulation based meshing algorithm is robust to outliers and in general more
-scalable to large datasets than the Poisson algorithm, but it usually produces
-less smooth surfaces. Furthermore, the Delaunay based meshing can be applied to
-sparse and dense reconstruction results.
+triangulation based meshing algorithm is more robust to outliers and in general
+more scalable to large datasets than the Poisson algorithm, but it usually
+produces less smooth surfaces. Furthermore, the Delaunay based meshing can be
+applied to sparse and dense reconstruction results. To increase the smoothness
+of the surface as a post-processing step, you could use Laplacian smoothing, as
+e.g. implemented in Meshlab.
 
 Note that the two algorithms can also be combined by first running the Delaunay
 meshing to robustly filter outliers from the sparse or dense point cloud and
@@ -350,14 +386,14 @@ The dense reconstruction can be speeded up in multiple ways:
 - Put more GPUs in your system as the dense reconstruction can make use of
   multiple GPUs during the stereo reconstruction step. Put more RAM into your
   system and increase the ``--DenseStereo.cache_size``,
-  ``--DenseFusion.cache_size`` to the largest possible value in order to
+  ``--StereoFusion.cache_size`` to the largest possible value in order to
   speed up the dense fusion step.
 
 - Do not perform geometric dense stereo reconstruction
   ``--DenseStereo.geom_consistency false``. Make sure to also enable
   ``--DenseStereo.filter true`` in this case.
 
-- Reduce the ``--DenseStereo.max_image_size``, ``--DenseFusion.max_image_size``
+- Reduce the ``--DenseStereo.max_image_size``, ``--StereoFusion.max_image_size``
   values to perform dense reconstruction on a maximum image resolution.
 
 - Reduce the number of source images per reference image to be considered, as
@@ -393,9 +429,9 @@ e.g. ``__auto__, 30`` to ``__auto__, 10``. Note that enabling the
 ``geom_consistency`` option increases the required GPU memory.
 
 If you run out of CPU memory during stereo or fusion, you can reduce the
-``--DenseStereo.cache_size`` or ``--DenseFusion.cache_size`` specified in
+``--DenseStereo.cache_size`` or ``--StereoFusion.cache_size`` specified in
 gigabytes or you can reduce ``--DenseStereo.max_image_size`` or
-``--DenseFusion.max_image_size``. Note that a too low value might lead to very
+``--StereoFusion.max_image_size``. Note that a too low value might lead to very
 slow processing and heavy load on the hard disk.
 
 For large-scale reconstructions of several thousands of images, you should

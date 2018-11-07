@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -58,13 +58,17 @@ const bool kUseOpenGL = true;
 int RunGraphicalUserInterface(int argc, char** argv) {
   OptionManager options;
 
+  std::string import_path;
+
   if (argc > 1) {
+    options.AddDefaultOption("import_path", &import_path);
     options.AddAllOptions();
     options.Parse(argc, argv);
   }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 6, 0))
   QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+  QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 #endif
 
   Q_INIT_RESOURCE(resources);
@@ -73,6 +77,10 @@ int RunGraphicalUserInterface(int argc, char** argv) {
 
   MainWindow main_window(options);
   main_window.show();
+
+  if (!import_path.empty()) {
+    main_window.ImportReconstruction(import_path);
+  }
 
   return app.exec();
 }
@@ -91,7 +99,7 @@ int RunAutomaticReconstructor(int argc, char** argv) {
                            &reconstruction_options.vocab_tree_path);
   options.AddDefaultOption("data_type", &data_type,
                            "{individual, video, internet}");
-  options.AddDefaultOption("quality", &quality, "{low, medium, high}");
+  options.AddDefaultOption("quality", &quality, "{low, medium, high, extreme}");
   options.AddDefaultOption("camera_model",
                            &reconstruction_options.camera_model);
   options.AddDefaultOption("single_camera",
@@ -128,6 +136,9 @@ int RunAutomaticReconstructor(int argc, char** argv) {
   } else if (quality == "high") {
     reconstruction_options.quality =
         AutomaticReconstructionController::Quality::HIGH;
+  } else if (quality == "extreme") {
+    reconstruction_options.quality =
+        AutomaticReconstructionController::Quality::EXTREME;
   } else {
     LOG(FATAL) << "Invalid quality provided";
   }
@@ -183,19 +194,19 @@ int RunBundleAdjuster(int argc, char** argv) {
 }
 
 int RunColorExtractor(int argc, char** argv) {
-  std::string import_path;
-  std::string export_path;
+  std::string input_path;
+  std::string output_path;
 
   OptionManager options;
   options.AddImageOptions();
-  options.AddDefaultOption("import_path", &import_path);
-  options.AddRequiredOption("export_path", &export_path);
+  options.AddDefaultOption("input_path", &input_path);
+  options.AddRequiredOption("output_path", &output_path);
   options.Parse(argc, argv);
 
   Reconstruction reconstruction;
-  reconstruction.Read(import_path);
+  reconstruction.Read(input_path);
   reconstruction.ExtractColorsForAllImages(*options.image_path);
-  reconstruction.Write(export_path);
+  reconstruction.Write(output_path);
 
   return EXIT_SUCCESS;
 }
@@ -285,8 +296,10 @@ int RunDelaunayMesher(int argc, char** argv) {
   std::string output_path;
 
   OptionManager options;
-  options.AddRequiredOption("input_path", &input_path);
-  options.AddDefaultOption("input_type", &input_type);
+  options.AddRequiredOption(
+      "input_path", &input_path,
+      "Path to either the dense workspace folder or the sparse reconstruction");
+  options.AddDefaultOption("input_type", &input_type, "{dense, sparse}");
   options.AddRequiredOption("output_path", &output_path);
   options.AddDelaunayMeshingOptions();
   options.Parse(argc, argv);
@@ -321,7 +334,9 @@ int RunPatchMatchStereo(int argc, char** argv) {
   std::string pmvs_option_name = "option-all";
 
   OptionManager options;
-  options.AddRequiredOption("workspace_path", &workspace_path);
+  options.AddRequiredOption(
+      "workspace_path", &workspace_path,
+      "Path to the folder containing the undistorted images");
   options.AddDefaultOption("workspace_format", &workspace_format,
                            "{COLMAP, PMVS}");
   options.AddDefaultOption("pmvs_option_name", &pmvs_option_name);
@@ -498,6 +513,84 @@ std::vector<std::pair<image_t, image_t>> ReadStereoImagePairs(
   return stereo_pairs;
 }
 
+int RunImageDeleter(int argc, char** argv) {
+  std::string input_path;
+  std::string output_path;
+  std::string image_ids_path;
+  std::string image_names_path;
+
+  OptionManager options;
+  options.AddRequiredOption("input_path", &input_path);
+  options.AddRequiredOption("output_path", &output_path);
+  options.AddDefaultOption(
+      "image_ids_path", &image_ids_path,
+      "Path to text file containing one image_id to delete per line");
+  options.AddDefaultOption(
+      "image_names_path", &image_names_path,
+      "Path to text file containing one image name to delete per line");
+  options.Parse(argc, argv);
+
+  Reconstruction reconstruction;
+  reconstruction.Read(input_path);
+
+  if (!image_ids_path.empty()) {
+    const auto image_ids = ReadTextFileLines(image_ids_path);
+
+    for (const auto image_id_str : image_ids) {
+      if (image_id_str.empty()) {
+        continue;
+      }
+
+      const image_t image_id = std::stoi(image_id_str);
+      if (reconstruction.ExistsImage(image_id)) {
+        const auto& image = reconstruction.Image(image_id);
+        std::cout
+            << StringPrintf(
+                   "Deleting image_id=%d, image_name=%s from reconstruction",
+                   image.ImageId(), image.Name().c_str())
+            << std::endl;
+        reconstruction.DeRegisterImage(image_id);
+      } else {
+        std::cout << StringPrintf(
+                         "WARNING: Skipping image_id=%s, because it does not "
+                         "exist in the reconstruction",
+                         image_id_str.c_str())
+                  << std::endl;
+      }
+    }
+  }
+
+  if (!image_names_path.empty()) {
+    const auto image_names = ReadTextFileLines(image_names_path);
+
+    for (const auto image_name : image_names) {
+      if (image_name.empty()) {
+        continue;
+      }
+
+      const Image* image = reconstruction.FindImageWithName(image_name);
+      if (image != nullptr) {
+        std::cout
+            << StringPrintf(
+                   "Deleting image_id=%d, image_name=%s from reconstruction",
+                   image->ImageId(), image->Name().c_str())
+            << std::endl;
+        reconstruction.DeRegisterImage(image->ImageId());
+      } else {
+        std::cout << StringPrintf(
+                         "WARNING: Skipping image_name=%s, because it does not "
+                         "exist in the reconstruction",
+                         image_name.c_str())
+                  << std::endl;
+      }
+    }
+  }
+
+  reconstruction.Write(output_path);
+
+  return EXIT_SUCCESS;
+}
+
 int RunImageRectifier(int argc, char** argv) {
   std::string input_path;
   std::string output_path;
@@ -534,23 +627,23 @@ int RunImageRectifier(int argc, char** argv) {
 }
 
 int RunImageRegistrator(int argc, char** argv) {
-  std::string import_path;
-  std::string export_path;
+  std::string input_path;
+  std::string output_path;
 
   OptionManager options;
   options.AddDatabaseOptions();
-  options.AddRequiredOption("import_path", &import_path);
-  options.AddRequiredOption("export_path", &export_path);
+  options.AddRequiredOption("input_path", &input_path);
+  options.AddRequiredOption("output_path", &output_path);
   options.AddMapperOptions();
   options.Parse(argc, argv);
 
-  if (!ExistsDir(import_path)) {
-    std::cerr << "ERROR: `import_path` is not a directory" << std::endl;
+  if (!ExistsDir(input_path)) {
+    std::cerr << "ERROR: `input_path` is not a directory" << std::endl;
     return EXIT_FAILURE;
   }
 
-  if (!ExistsDir(export_path)) {
-    std::cerr << "ERROR: `export_path` is not a directory" << std::endl;
+  if (!ExistsDir(output_path)) {
+    std::cerr << "ERROR: `output_path` is not a directory" << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -574,7 +667,7 @@ int RunImageRegistrator(int argc, char** argv) {
   std::cout << std::endl;
 
   Reconstruction reconstruction;
-  reconstruction.Read(import_path);
+  reconstruction.Read(input_path);
 
   IncrementalMapper mapper(&database_cache);
   mapper.BeginReconstruction(&reconstruction);
@@ -599,7 +692,7 @@ int RunImageRegistrator(int argc, char** argv) {
   const bool kDiscardReconstruction = false;
   mapper.EndReconstruction(kDiscardReconstruction);
 
-  reconstruction.Write(export_path);
+  reconstruction.Write(output_path);
 
   return EXIT_SUCCESS;
 }
@@ -615,7 +708,8 @@ int RunImageUndistorter(int argc, char** argv) {
   options.AddImageOptions();
   options.AddRequiredOption("input_path", &input_path);
   options.AddRequiredOption("output_path", &output_path);
-  options.AddDefaultOption("output_type", &output_type);
+  options.AddDefaultOption("output_type", &output_type,
+                           "{COLMAP, PMVS, CMP-MVS}");
   options.AddDefaultOption("blank_pixels",
                            &undistort_camera_options.blank_pixels);
   options.AddDefaultOption("min_scale", &undistort_camera_options.min_scale);
@@ -660,21 +754,21 @@ int RunImageUndistorter(int argc, char** argv) {
 }
 
 int RunMapper(int argc, char** argv) {
-  std::string import_path;
-  std::string export_path;
+  std::string input_path;
+  std::string output_path;
   std::string image_list_path;
 
   OptionManager options;
   options.AddDatabaseOptions();
   options.AddImageOptions();
-  options.AddDefaultOption("import_path", &import_path);
-  options.AddRequiredOption("export_path", &export_path);
+  options.AddDefaultOption("input_path", &input_path);
+  options.AddRequiredOption("output_path", &output_path);
   options.AddDefaultOption("image_list_path", &image_list_path);
   options.AddMapperOptions();
   options.Parse(argc, argv);
 
-  if (!ExistsDir(export_path)) {
-    std::cerr << "ERROR: `export_path` is not a directory." << std::endl;
+  if (!ExistsDir(output_path)) {
+    std::cerr << "ERROR: `output_path` is not a directory." << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -685,12 +779,12 @@ int RunMapper(int argc, char** argv) {
   }
 
   ReconstructionManager reconstruction_manager;
-  if (import_path != "") {
-    if (!ExistsDir(import_path)) {
-      std::cerr << "ERROR: `import_path` is not a directory." << std::endl;
+  if (input_path != "") {
+    if (!ExistsDir(input_path)) {
+      std::cerr << "ERROR: `input_path` is not a directory." << std::endl;
       return EXIT_FAILURE;
     }
-    reconstruction_manager.Read(import_path);
+    reconstruction_manager.Read(input_path);
   }
 
   IncrementalMapperController mapper(options.mapper.get(), *options.image_path,
@@ -701,14 +795,14 @@ int RunMapper(int argc, char** argv) {
   // models to as their reconstruction finishes instead of writing all results
   // after all reconstructions finished.
   size_t prev_num_reconstructions = 0;
-  if (import_path == "") {
+  if (input_path == "") {
     mapper.AddCallback(
         IncrementalMapperController::LAST_IMAGE_REG_CALLBACK, [&]() {
           // If the number of reconstructions has not changed, the last model
           // was discarded for some reason.
           if (reconstruction_manager.Size() > prev_num_reconstructions) {
             const std::string reconstruction_path = JoinPaths(
-                export_path, std::to_string(prev_num_reconstructions));
+                output_path, std::to_string(prev_num_reconstructions));
             const auto& reconstruction =
                 reconstruction_manager.Get(prev_num_reconstructions);
             CreateDirIfNotExists(reconstruction_path);
@@ -724,8 +818,8 @@ int RunMapper(int argc, char** argv) {
 
   // In case the reconstruction is continued from an existing reconstruction, do
   // not create sub-folders but directly write the results.
-  if (import_path != "" && reconstruction_manager.Size() > 0) {
-    reconstruction_manager.Get(0).Write(export_path);
+  if (input_path != "" && reconstruction_manager.Size() > 0) {
+    reconstruction_manager.Get(0).Write(output_path);
   }
 
   return EXIT_SUCCESS;
@@ -734,13 +828,13 @@ int RunMapper(int argc, char** argv) {
 int RunHierarchicalMapper(int argc, char** argv) {
   HierarchicalMapperController::Options hierarchical_options;
   SceneClustering::Options clustering_options;
-  std::string export_path;
+  std::string output_path;
 
   OptionManager options;
   options.AddRequiredOption("database_path",
                             &hierarchical_options.database_path);
   options.AddRequiredOption("image_path", &hierarchical_options.image_path);
-  options.AddRequiredOption("export_path", &export_path);
+  options.AddRequiredOption("output_path", &output_path);
   options.AddDefaultOption("num_workers", &hierarchical_options.num_workers);
   options.AddDefaultOption("image_overlap", &clustering_options.image_overlap);
   options.AddDefaultOption("leaf_max_num_images",
@@ -748,8 +842,8 @@ int RunHierarchicalMapper(int argc, char** argv) {
   options.AddMapperOptions();
   options.Parse(argc, argv);
 
-  if (!ExistsDir(export_path)) {
-    std::cerr << "ERROR: `export_path` is not a directory." << std::endl;
+  if (!ExistsDir(output_path)) {
+    std::cerr << "ERROR: `output_path` is not a directory." << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -761,7 +855,7 @@ int RunHierarchicalMapper(int argc, char** argv) {
   hierarchical_mapper.Start();
   hierarchical_mapper.Wait();
 
-  reconstruction_manager.Write(export_path, &options);
+  reconstruction_manager.Write(output_path, &options);
 
   return EXIT_SUCCESS;
 }
@@ -933,7 +1027,7 @@ int RunModelConverter(int argc, char** argv) {
   options.AddRequiredOption("input_path", &input_path);
   options.AddRequiredOption("output_path", &output_path);
   options.AddRequiredOption("output_type", &output_type,
-                            "{'BIN', 'TXT', 'NVM', 'Bundler', 'VRML', 'PLY'}");
+                            "{BIN, TXT, NVM, Bundler, VRML, PLY}");
   options.Parse(argc, argv);
 
   Reconstruction reconstruction;
@@ -968,7 +1062,7 @@ int RunModelMerger(int argc, char** argv) {
   std::string input_path1;
   std::string input_path2;
   std::string output_path;
-  double max_reproj_error = 8.0;
+  double max_reproj_error = 64.0;
 
   OptionManager options;
   options.AddRequiredOption("input_path1", &input_path1);
@@ -1102,24 +1196,24 @@ int RunSequentialMatcher(int argc, char** argv) {
 }
 
 int RunPointTriangulator(int argc, char** argv) {
-  std::string import_path;
-  std::string export_path;
+  std::string input_path;
+  std::string output_path;
 
   OptionManager options;
   options.AddDatabaseOptions();
   options.AddImageOptions();
-  options.AddRequiredOption("import_path", &import_path);
-  options.AddRequiredOption("export_path", &export_path);
+  options.AddRequiredOption("input_path", &input_path);
+  options.AddRequiredOption("output_path", &output_path);
   options.AddMapperOptions();
   options.Parse(argc, argv);
 
-  if (!ExistsDir(import_path)) {
-    std::cerr << "ERROR: `import_path` is not a directory" << std::endl;
+  if (!ExistsDir(input_path)) {
+    std::cerr << "ERROR: `input_path` is not a directory" << std::endl;
     return EXIT_FAILURE;
   }
 
-  if (!ExistsDir(export_path)) {
-    std::cerr << "ERROR: `export_path` is not a directory" << std::endl;
+  if (!ExistsDir(output_path)) {
+    std::cerr << "ERROR: `output_path` is not a directory" << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -1145,7 +1239,7 @@ int RunPointTriangulator(int argc, char** argv) {
   std::cout << std::endl;
 
   Reconstruction reconstruction;
-  reconstruction.Read(import_path);
+  reconstruction.Read(input_path);
 
   CHECK_GE(reconstruction.NumRegImages(), 2)
       << "Need at least two images for triangulation";
@@ -1220,7 +1314,7 @@ int RunPointTriangulator(int argc, char** argv) {
   const bool kDiscardReconstruction = false;
   mapper.EndReconstruction(kDiscardReconstruction);
 
-  reconstruction.Write(export_path);
+  reconstruction.Write(output_path);
 
   return EXIT_SUCCESS;
 }
@@ -1314,9 +1408,9 @@ std::vector<CameraRig> ReadCameraRigConfig(
     for (const auto image_id : reconstruction.RegImageIds()) {
       const auto& image = reconstruction.Image(image_id);
       for (const auto& image_prefix : image_prefixes) {
-        if (StringStartsWith(image.Name(), image_prefix)) {
+        if (StringContains(image.Name(), image_prefix)) {
           const std::string image_suffix =
-              StringReplace(image.Name(), image_prefix, "");
+              StringGetAfter(image.Name(), image_prefix);
           snapshots[image_suffix].push_back(image_id);
         }
       }
@@ -1719,7 +1813,7 @@ int ShowHelp(
   std::cout << "  colmap exhaustive_matcher --database_path DATABASE"
             << std::endl;
   std::cout << "  colmap mapper --image_path IMAGES --database_path DATABASE "
-               "--export_path EXPORT"
+               "--output_path MODEL"
             << std::endl;
   std::cout << "  ..." << std::endl << std::endl;
 
@@ -1747,6 +1841,7 @@ int main(int argc, char** argv) {
   commands.emplace_back("feature_extractor", &RunFeatureExtractor);
   commands.emplace_back("feature_importer", &RunFeatureImporter);
   commands.emplace_back("hierarchical_mapper", &RunHierarchicalMapper);
+  commands.emplace_back("image_deleter", &RunImageDeleter);
   commands.emplace_back("image_rectifier", &RunImageRectifier);
   commands.emplace_back("image_registrator", &RunImageRegistrator);
   commands.emplace_back("image_undistorter", &RunImageUndistorter);

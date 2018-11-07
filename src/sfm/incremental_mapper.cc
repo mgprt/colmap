@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #include "sfm/incremental_mapper.h"
 
@@ -460,6 +460,7 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
     } else {
       abs_pose_options.estimate_focal_length = false;
       abs_pose_refinement_options.refine_focal_length = false;
+      abs_pose_refinement_options.refine_extra_params = false;
     }
   } else {
     // Camera not refined before.
@@ -1119,7 +1120,7 @@ bool IncrementalMapper::EstimateInitialTwoViewGeometry(
 
   TwoViewGeometry two_view_geometry;
   TwoViewGeometry::Options two_view_geometry_options;
-  two_view_geometry_options.ransac_options.min_num_trials = 25;
+  two_view_geometry_options.ransac_options.min_num_trials = 30;
   two_view_geometry_options.ransac_options.max_error = options.init_max_error;
   two_view_geometry.EstimateCalibrated(camera1, points1, camera2, points2,
                                        matches, two_view_geometry_options);

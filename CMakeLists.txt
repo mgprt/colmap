@@ -27,27 +27,27 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-# Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+# Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 cmake_minimum_required(VERSION 3.0)
 
 project(COLMAP)
 
-set(COLMAP_VERSION "3.4")
-set(COLMAP_VERSION_NUMBER "3400")
+set(COLMAP_VERSION "3.6")
+set(COLMAP_VERSION_NUMBER "3600")
 
 
 ################################################################################
 # Include CMake dependencies
 ################################################################################
 
-set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 include(CheckCXXCompilerFlag)
 
 # Include helper macros and commands, and allow the included file to override
 # the CMake policies in this file
-include(${CMAKE_SOURCE_DIR}/cmake/CMakeHelper.cmake NO_POLICY_SCOPE)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeHelper.cmake NO_POLICY_SCOPE)
 
 
 ################################################################################
@@ -140,9 +140,13 @@ else()
 endif()
 
 if(IS_MSVC)
+    # Some fixes for the Glog library.
     add_definitions("-DGLOG_NO_ABBREVIATED_SEVERITIES")
     add_definitions("-DGL_GLEXT_PROTOTYPES")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /bigobj")
+    # Enable object level parallel builds in Visual Studio.
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MP")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
 endif()
 
 if(IS_GNU)
@@ -181,12 +185,16 @@ if(CUDA_FOUND)
     if(CUDA_ENABLED)
         add_definitions("-DCUDA_ENABLED")
 
-        include(${CMAKE_SOURCE_DIR}/cmake/SelectCudaComputeArch.cmake)
+        include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SelectCudaComputeArch.cmake)
 
         CUDA_SELECT_NVCC_ARCH_FLAGS(CUDA_ARCH_FLAGS ${CUDA_ARCHS})
 
-        set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -Wno-deprecated-gpu-targets")
         set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} ${CUDA_ARCH_FLAGS}")
+
+        # Fix for some combinations of CUDA and GCC (e.g. under Ubuntu 16.04).
+        set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -D_FORCE_INLINES")
+        # Do not show warnings if the architectures are deprecated.
+        set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -Wno-deprecated-gpu-targets")
 
         message(STATUS "Enabling CUDA support (version: ${CUDA_VERSION_STRING},"
                        " archs: ${CUDA_ARCH_FLAGS_readable})")
@@ -224,6 +232,7 @@ if(CGAL_FOUND AND CGAL_ENABLED)
     add_definitions("-DCGAL_ENABLED")
 else()
     message(STATUS "Disabling CGAL support")
+    set(CGAL_ENABLED OFF)
 endif()
 
 # Qt5 was built with -reduce-relocations.
@@ -277,7 +286,7 @@ set(COLMAP_EXTERNAL_LIBRARIES
     ${Qt5Widgets_LIBRARIES}
 )
 
-if(CGAL_FOUND AND CGAL_ENABLED)
+if(CGAL_ENABLED)
     list(APPEND COLMAP_INCLUDE_DIRS ${CGAL_INCLUDE_DIRS} ${GMP_INCLUDE_DIR})
     list(APPEND COLMAP_EXTERNAL_LIBRARIES ${CGAL_LIBRARY} ${GMP_LIBRARIES})
     list(APPEND COLMAP_LINK_DIRS ${CGAL_LIBRARIES_DIR})
@@ -390,20 +399,20 @@ install(DIRECTORY src/
         FILES_MATCHING PATTERN "*.h")
 install(DIRECTORY lib/
         DESTINATION include/colmap/lib
-        FILES_MATCHING PATTERN "*.h")
+        FILES_MATCHING REGEX ".*[.]h|.*[.]hpp|.*[.]inl")
 
 # Generate and install CMake configuration.
-configure_file("${CMAKE_SOURCE_DIR}/cmake/CMakeConfig.cmake.in"
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeConfig.cmake.in"
                "${CMAKE_CURRENT_BINARY_DIR}/COLMAPConfig.cmake" @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/COLMAPConfig.cmake"
         DESTINATION "share/colmap")
-configure_file("${CMAKE_SOURCE_DIR}/cmake/CMakeConfigVersion.cmake.in"
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeConfigVersion.cmake.in"
                "${CMAKE_CURRENT_BINARY_DIR}/COLMAPConfigVersion.cmake" @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/COLMAPConfigVersion.cmake"
         DESTINATION "share/colmap")
 
 # Install find_package scripts for dependencies.
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/cmake
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/cmake
         DESTINATION share/colmap
         FILES_MATCHING PATTERN "Find*.cmake")
 
@@ -421,7 +430,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # Configure the uninstallation script.
-configure_file("${CMAKE_SOURCE_DIR}/cmake/CMakeUninstall.cmake.in"
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeUninstall.cmake.in"
                "${CMAKE_CURRENT_BINARY_DIR}/CMakeUninstall.cmake"
                IMMEDIATE @ONLY)
 add_custom_target(uninstall COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/CMakeUninstall.cmake)

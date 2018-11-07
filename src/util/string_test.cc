@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "util/string"
 #include "util/testing.h"
@@ -62,6 +62,15 @@ BOOST_AUTO_TEST_CASE(TestStringReplace) {
   BOOST_CHECK_EQUAL(StringReplace("test", "", "a"), "test");
   BOOST_CHECK_EQUAL(StringReplace("test", "", ""), "test");
   BOOST_CHECK_EQUAL(StringReplace("ttt", "ttt", "+++"), "+++");
+}
+
+BOOST_AUTO_TEST_CASE(TestStringGetAfter) {
+  BOOST_CHECK_EQUAL(StringGetAfter("test", ""), "test");
+  BOOST_CHECK_EQUAL(StringGetAfter("test", "notinit"), "");
+  BOOST_CHECK_EQUAL(StringGetAfter("test", "e"), "st");
+  BOOST_CHECK_EQUAL(StringGetAfter("test, multiple tests", "test"), "s");
+  BOOST_CHECK_EQUAL(StringGetAfter("", ""), "");
+  BOOST_CHECK_EQUAL(StringGetAfter("path/to/dataset/sub1/image.png", "sub1/"), "image.png");
 }
 
 BOOST_AUTO_TEST_CASE(TestStringSplit) {

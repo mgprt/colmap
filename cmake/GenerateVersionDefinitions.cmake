@@ -27,18 +27,18 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-# Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+# Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
-if(Git_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
+if(Git_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
     execute_process(COMMAND
         "${GIT_EXECUTABLE}" rev-parse --short HEAD
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         OUTPUT_VARIABLE GIT_COMMIT_ID
         ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
 
     execute_process(COMMAND
         "${GIT_EXECUTABLE}" log -1 --format=%ad --date=short
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         OUTPUT_VARIABLE GIT_COMMIT_DATE
         ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
 else()
@@ -46,5 +46,5 @@ else()
     set(GIT_COMMIT_DATE "Unknown")
 endif()
 
-configure_file("${CMAKE_SOURCE_DIR}/src/util/version.h.in"
-               "${CMAKE_SOURCE_DIR}/src/util/version.h")
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/util/version.h.in"
+               "${CMAKE_CURRENT_SOURCE_DIR}/src/util/version.h")

@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #include "util/string.h"
 
@@ -149,6 +149,17 @@ std::string StringReplace(const std::string& str, const std::string& old_str,
     position += new_str.size();
   }
   return mod_str;
+}
+
+std::string StringGetAfter(const std::string& str, const std::string& key) {
+  if (key.empty()) {
+    return str;
+  }
+  std::size_t found = str.rfind(key);
+  if (found != std::string::npos) {
+    return str.substr(found + key.length(), str.length() - (found + key.length()));
+  }
+  return "";
 }
 
 std::vector<std::string> StringSplit(const std::string& str,

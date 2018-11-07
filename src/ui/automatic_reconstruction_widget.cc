@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #include "ui/automatic_reconstruction_widget.h"
 
@@ -70,6 +70,7 @@ AutomaticReconstructionWidget::AutomaticReconstructionWidget(
   quality_cb_->addItem("Low");
   quality_cb_->addItem("Medium");
   quality_cb_->addItem("High");
+  quality_cb_->addItem("Extreme");
   quality_cb_->setCurrentIndex(2);
   grid_layout_->addWidget(quality_cb_, grid_layout_->rowCount() - 1, 1);
 
@@ -149,6 +150,9 @@ void AutomaticReconstructionWidget::Run() {
     case 2:
       options_.quality = AutomaticReconstructionController::Quality::HIGH;
       break;
+    case 3:
+      options_.quality = AutomaticReconstructionController::Quality::EXTREME;
+      break;
     default:
       options_.quality = AutomaticReconstructionController::Quality::HIGH;
       break;
@@ -162,7 +166,7 @@ void AutomaticReconstructionWidget::Run() {
       options_.mesher = AutomaticReconstructionController::Mesher::DELAUNAY;
       break;
     default:
-      options_.mesher = AutomaticReconstructionController::Mesher::DELAUNAY;
+      options_.mesher = AutomaticReconstructionController::Mesher::POISSON;
       break;
   }
 

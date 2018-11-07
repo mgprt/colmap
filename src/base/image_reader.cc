@@ -27,7 +27,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// Author: Johannes L. Schoenberger (jsch at inf.ethz.ch)
+// Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #include "base/image_reader.h"
 
@@ -74,6 +74,7 @@ ImageReader::ImageReader(const ImageReaderOptions& options, Database* database)
     prev_camera_.SetModelIdFromName(options_.camera_model);
     if (!options_.camera_params.empty()) {
       prev_camera_.SetParamsFromString(options_.camera_params);
+      prev_camera_.SetPriorFocalLength(true);
     }
   }
 }
