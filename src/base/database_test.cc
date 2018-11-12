@@ -151,13 +151,13 @@ BOOST_AUTO_TEST_CASE(TestCamera) {
 
 BOOST_AUTO_TEST_CASE(TestImage) {
   Database database(kMemoryDatabasePath);
-  Camera camera;
-  camera.InitializeWithName("SIMPLE_PINHOLE", 1.0, 1, 1);
-  camera.SetCameraId(database.WriteCamera(camera));
+  Camera camera1;
+  camera1.InitializeWithName("SIMPLE_PINHOLE", 1.0, 1, 1);
+  camera1.SetCameraId(database.WriteCamera(camera1));
   BOOST_CHECK_EQUAL(database.NumImages(), 0);
   Image image;
   image.SetName("test");
-  image.SetCameraId(camera.CameraId());
+  image.SetCameraId(camera1.CameraId());
   image.SetQvecPrior(Eigen::Vector4d(0.1, 0.2, 0.3, 0.4));
   image.SetTvecPrior(Eigen::Vector3d(0.1, 0.2, 0.3));
   image.SetImageId(database.WriteImage(image));
@@ -209,6 +209,28 @@ BOOST_AUTO_TEST_CASE(TestImage) {
   BOOST_CHECK_EQUAL(database.ExistsImage(image.ImageId()), true);
   BOOST_CHECK_EQUAL(database.ExistsImage(image2.ImageId()), true);
   BOOST_CHECK_EQUAL(database.ReadAllImages().size(), 2);
+  Camera camera2;
+  camera2.InitializeWithName("SIMPLE_PINHOLE", 1.0, 1, 1);
+  camera2.SetCameraId(database.WriteCamera(camera2));
+  Image image3 = image;
+  image3.SetName("test3");
+  image3.SetImageId(image2.ImageId() + 1);
+  image3.SetCameraId(camera2.CameraId());
+  database.WriteImage(image3, true);
+  BOOST_CHECK_EQUAL(database.ExistsImage(image3.ImageId()), true);
+  const std::vector<Image> camera1_images =
+      database.ReadCameraImages(camera1.CameraId());
+  BOOST_CHECK_EQUAL(camera1_images.size(), 2);
+  for (const Image& image : camera1_images) {
+    BOOST_CHECK_EQUAL(image.CameraId(), camera1.CameraId());
+  }
+  const std::vector<Image> camera2_images =
+      database.ReadCameraImages(camera2.CameraId());
+  BOOST_CHECK_EQUAL(camera2_images.size(), 1);
+  for (const Image& image : camera2_images) {
+    BOOST_CHECK_EQUAL(image.CameraId(), camera2.CameraId());
+  }
+  BOOST_CHECK_EQUAL(database.ReadCameraImages(kInvalidCameraId).size(), 0);
 }
 
 BOOST_AUTO_TEST_CASE(TestKeypoints) {

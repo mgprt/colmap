@@ -429,6 +429,24 @@ std::vector<Image> Database::ReadAllImages() const {
   return images;
 }
 
+std::vector<Image> Database::ReadCameraImages(const camera_t camera_id) const {
+  std::vector<Image> images;
+  // We have no idea how many images we will read, so we do not reserve any
+  // space beforehand and let the vector class handle memory allocation
+  // automatically to avoid reserving a lot of memory for just a few images.
+
+  SQLITE3_CALL(sqlite3_bind_int64(sql_stmt_read_camera_images_, 1, camera_id));
+
+  while (SQLITE3_CALL(sqlite3_step(sql_stmt_read_camera_images_)) ==
+         SQLITE_ROW) {
+    images.push_back(ReadImageRow(sql_stmt_read_camera_images_));
+  }
+
+  SQLITE3_CALL(sqlite3_reset(sql_stmt_read_camera_images_));
+
+  return images;
+}
+
 FeatureKeypoints Database::ReadKeypoints(const image_t image_id) const {
   SQLITE3_CALL(sqlite3_bind_int64(sql_stmt_read_keypoints_, 1, image_id));
 
@@ -941,6 +959,11 @@ void Database::PrepareSQLStatements() {
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
                                   &sql_stmt_read_images_, 0));
   sql_stmts_.push_back(sql_stmt_read_images_);
+
+  sql = "SELECT * FROM images WHERE camera_id = ?;";
+  SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
+                                  &sql_stmt_read_camera_images_, 0));
+  sql_stmts_.push_back(sql_stmt_read_camera_images_);
 
   sql = "SELECT rows, cols, data FROM keypoints WHERE image_id = ?;";
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
