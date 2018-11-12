@@ -144,6 +144,7 @@ class Database {
 
   Image ReadImage(const image_t image_id) const;
   Image ReadImageWithName(const std::string& name) const;
+  std::pair<size_t,size_t> ReadImageSize(const image_t image_id) const;
   std::vector<Image> ReadAllImages() const;
   std::vector<Image> ReadCameraImages(const camera_t camera_id) const;
 
@@ -290,6 +291,7 @@ class Database {
   sqlite3_stmt* sql_stmt_read_cameras_ = nullptr;
   sqlite3_stmt* sql_stmt_read_image_id_ = nullptr;
   sqlite3_stmt* sql_stmt_read_image_name_ = nullptr;
+  sqlite3_stmt* sql_stmt_read_image_size_ = nullptr;
   sqlite3_stmt* sql_stmt_read_images_ = nullptr;
   sqlite3_stmt* sql_stmt_read_camera_images_ = nullptr;
   sqlite3_stmt* sql_stmt_read_keypoints_ = nullptr;

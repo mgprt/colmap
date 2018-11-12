@@ -416,6 +416,25 @@ Image Database::ReadImageWithName(const std::string& name) const {
   return image;
 }
 
+std::pair<size_t, size_t> Database::ReadImageSize(
+    const colmap::image_t image_id) const {
+  SQLITE3_CALL(sqlite3_bind_int64(sql_stmt_read_image_size_, 1, image_id));
+
+  size_t width{0}, height{0};
+
+  const int rc = SQLITE3_CALL(sqlite3_step(sql_stmt_read_image_size_));
+  if (rc == SQLITE_ROW) {
+    width =
+        static_cast<size_t>(sqlite3_column_int64(sql_stmt_read_image_size_, 0));
+    height =
+        static_cast<size_t>(sqlite3_column_int64(sql_stmt_read_image_size_, 1));
+  }
+
+  SQLITE3_CALL(sqlite3_reset(sql_stmt_read_image_size_));
+
+  return std::make_pair(width, height);
+}
+
 std::vector<Image> Database::ReadAllImages() const {
   std::vector<Image> images;
   images.reserve(NumImages());
@@ -954,6 +973,13 @@ void Database::PrepareSQLStatements() {
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
                                   &sql_stmt_read_image_name_, 0));
   sql_stmts_.push_back(sql_stmt_read_image_name_);
+
+  sql =
+      "SELECT width, height FROM cameras JOIN images ON images.camera_id = "
+      "cameras.camera_id WHERE image_id = ?;";
+  SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
+                                  &sql_stmt_read_image_size_, 0));
+  sql_stmts_.push_back(sql_stmt_read_image_size_);
 
   sql = "SELECT * FROM images;";
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
