@@ -294,6 +294,9 @@ BOOST_AUTO_TEST_CASE(TestKeypoints) {
   BOOST_CHECK_EQUAL(database.NumKeypoints(), 30);
   BOOST_CHECK_EQUAL(database.MaxNumKeypoints(), 20);
   BOOST_CHECK_EQUAL(database.NumKeypointsForImage(image.ImageId()), 20);
+
+  database.DeleteFeatures(image.ImageId());
+  BOOST_CHECK_EQUAL(database.NumKeypointsForImage(image.ImageId()), 0);
 }
 
 BOOST_AUTO_TEST_CASE(TestDescriptors) {
@@ -327,6 +330,9 @@ BOOST_AUTO_TEST_CASE(TestDescriptors) {
   BOOST_CHECK_EQUAL(database.NumDescriptors(), 30);
   BOOST_CHECK_EQUAL(database.MaxNumDescriptors(), 20);
   BOOST_CHECK_EQUAL(database.NumDescriptorsForImage(image.ImageId()), 20);
+
+  database.DeleteFeatures(image.ImageId());
+  BOOST_CHECK_EQUAL(database.NumKeypointsForImage(image.ImageId()), 0);
 }
 
 BOOST_AUTO_TEST_CASE(TestMatches) {

@@ -823,6 +823,16 @@ void Database::UpdateImage(const Image& image) const {
   SQLITE3_CALL(sqlite3_reset(sql_stmt_update_image_));
 }
 
+void Database::DeleteFeatures(const image_t image_id) const {
+  SQLITE3_CALL(sqlite3_bind_int(sql_stmt_delete_keypoints_, 1, image_id));
+  SQLITE3_CALL(sqlite3_step(sql_stmt_delete_keypoints_));
+  SQLITE3_CALL(sqlite3_reset(sql_stmt_delete_keypoints_));
+
+  SQLITE3_CALL(sqlite3_bind_int(sql_stmt_delete_descriptors_, 1, image_id));
+  SQLITE3_CALL(sqlite3_step(sql_stmt_delete_descriptors_));
+  SQLITE3_CALL(sqlite3_reset(sql_stmt_delete_descriptors_));
+}
+
 void Database::DeleteMatches(const image_t image_id1,
                              const image_t image_id2) const {
   const image_pair_t pair_id = ImagePairToPairId(image_id1, image_id2);
@@ -1058,6 +1068,16 @@ void Database::PrepareSQLStatements() {
   //////////////////////////////////////////////////////////////////////////////
   // delete_*
   //////////////////////////////////////////////////////////////////////////////
+  sql = "DELETE FROM keypoints WHERE image_id = ?";
+  SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
+                                  &sql_stmt_delete_keypoints_, 0));
+  sql_stmts_.push_back(sql_stmt_delete_keypoints_);
+
+  sql = "DELETE FROM descriptors WHERE image_id = ?";
+  SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
+                                  &sql_stmt_delete_descriptors_, 0));
+  sql_stmts_.push_back(sql_stmt_delete_descriptors_);
+
   sql = "DELETE FROM matches WHERE pair_id = ?;";
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
                                   &sql_stmt_delete_matches_, 0));
