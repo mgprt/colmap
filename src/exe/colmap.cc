@@ -42,6 +42,7 @@
 #include "controllers/hierarchical_mapper.h"
 #include "estimators/coordinate_frame.h"
 #include "feature/extraction.h"
+#include "feature/masking.h"
 #include "feature/matching.h"
 #include "feature/utils.h"
 #include "mvs/meshing.h"
@@ -515,6 +516,101 @@ std::vector<std::pair<image_t, image_t>> ReadStereoImagePairs(
   }
 
   return stereo_pairs;
+}
+
+int RunDbFeatureMasker(int argc, char** argv) {
+  std::string image_masks_list{""};
+  std::string camera_masks_list{""};
+  std::string image_masks_path{""};
+  std::string camera_masks_path{""};
+  std::string image_list_path{""};
+
+  OptionManager options;
+  options.AddDatabaseOptions();
+  options.AddDefaultOption(
+      "image_masks", &image_masks_list,
+      "Comma-separated list of image_id:mask_path pairs, e.g., "
+      "\"1:mask1.jpg,2:../othermask.jpg\". If both image- and camera masks are"
+      " set, image masks will overwrite camera masks.");
+  options.AddDefaultOption(
+      "camera_masks", &camera_masks_list,
+      "Comma-separated list of camera_id:mask_path pairs, e.g., "
+      "\"1:mask1.jpg,2:../othermask.jpg\". If both image- and camera masks are"
+      " set, image masks will overwrite camera masks.");
+  options.AddDefaultOption(
+      "image_masks_file", &image_masks_path,
+      "File with one image_id:mask_path pair per line, e.g.,\n"
+      "1:mask1.jpg\n2:../othermask.jpg\n...\n\n If both image- and camera masks"
+      " are set, image masks will overwrite camera masks.");
+  options.AddDefaultOption(
+      "camera_masks_file", &camera_masks_path,
+      "File with one camera_id:mask_path pair per line, e.g.,\n"
+      "1:mask1.jpg\n2:../othermask.jpg\n...\n\n If both image- and camera masks"
+      " are set, image masks will overwrite camera masks.");
+
+  // TODO Add mask folder + prefix option (assuming maskname = prefix+imagename)
+
+  options.Parse(argc, argv);
+
+  // Check for contradictory arguments. The image/camera masks list and file
+  // should not be used together
+  if (image_masks_list != "" && image_masks_path != "") {
+    std::cerr << "Argument error - image_masks_list and image_masks_file "
+                 "cannot be used together.\n";
+    return EXIT_FAILURE;
+  }
+  if (camera_masks_list != "" && camera_masks_path != "") {
+    std::cerr << "Argument error - camera_masks_list and camera_masks_file "
+                 "cannot be used together.\n";
+    return EXIT_FAILURE;
+  }
+  if (image_masks_list == "" && image_masks_path == "" &&
+      camera_masks_list == "" && camera_masks_path == "") {
+    std::cerr << "Argument error - no masks specified.\n";
+    return EXIT_FAILURE;
+  }
+
+  Database database(*options.database_path);
+
+  std::unordered_map<image_t, std::string> image_mask_paths = [&]() {
+    if (!image_masks_list.empty()) {
+      return FeatureMaskReader::ReadImageMaskString(image_masks_list);
+    } else if (!image_masks_path.empty()) {
+      return FeatureMaskReader::ReadImageMaskFile(image_masks_path);
+    } else {
+      return std::unordered_map<image_t, std::string>{};
+    }
+  }();
+
+  {
+    const std::unordered_map<camera_t, std::string> camera_mask_paths = [&]() {
+      if (!camera_masks_list.empty()) {
+        return FeatureMaskReader::ReadCameraMaskString(camera_masks_list);
+      } else if (!camera_masks_path.empty()) {
+        return FeatureMaskReader::ReadCameraMaskFile(camera_masks_path);
+      } else {
+        return std::unordered_map<camera_t, std::string>{};
+      }
+    }();
+
+    // Generate image masks from given camera masks
+    const std::unordered_map<image_t, std::string> camera_image_mask_paths =
+        FeatureMaskReader{database}.CameraMasksToImageMasks(camera_mask_paths);
+
+    // Merge the two mask maps. Insert will not replace the value of an existing
+    // key, only insert a new one. This way, any explicitly given image mask
+    // overwrites the corresponding camera map.
+    // TODO We could also consider merging maps instead.
+    image_mask_paths.insert(camera_image_mask_paths.begin(),
+                            camera_image_mask_paths.end());
+  }
+
+  const std::unordered_map<image_t, std::shared_ptr<Bitmap>> image_masks =
+      FeatureMaskReader::ReadMasks(image_mask_paths);
+
+  DbImageFeatureMasker{database}.MaskImageFeatures(image_masks);
+
+  return EXIT_SUCCESS;
 }
 
 int RunImageDeleter(int argc, char** argv) {
@@ -1882,6 +1978,7 @@ int main(int argc, char** argv) {
   commands.emplace_back("exhaustive_matcher", &RunExhaustiveMatcher);
   commands.emplace_back("feature_extractor", &RunFeatureExtractor);
   commands.emplace_back("feature_importer", &RunFeatureImporter);
+  commands.emplace_back("feature_masker", &RunDbFeatureMasker);
   commands.emplace_back("hierarchical_mapper", &RunHierarchicalMapper);
   commands.emplace_back("image_deleter", &RunImageDeleter);
   commands.emplace_back("image_rectifier", &RunImageRectifier);
