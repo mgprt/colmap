@@ -2130,6 +2130,17 @@ int RunLocExport(int argc, char** argv) {
   Reconstruction map;
   map.Read(input_path);
 
+  // BA can affect the scale, so we store the initial image positions and
+  // align the individual point clouds after optimization.
+  std::vector<std::string> image_names;
+  std::vector<Eigen::Vector3d> ref_image_positions;
+  for (const image_t image_id : map.RegImageIds()) {
+    const auto& im = map.Image(image_id);
+
+    image_names.emplace_back(im.Name());
+    ref_image_positions.emplace_back(im.ProjectionCenter());
+  }
+
   std::string im_file_path =
       JoinPaths(export_path, "images.txt");
   std::ofstream images_stream(im_file_path);
@@ -2194,38 +2205,78 @@ int RunLocExport(int argc, char** argv) {
     // Create the local point cloud for querying
     Reconstruction query_rec = map;
 
-    // Loop over the images in map instead of query_pc because we change the
-    // latter in the loop.
-    for (const image_t map_image_id : map.RegImageIds()) {
-      if (local_image_set.count(map_image_id) == 0) {
-        query_rec.DeRegisterImage(map_image_id);
-      }
-    }
-
-    IncrementalMapper mapper(&database_cache);
-    mapper.BeginReconstruction(&query_rec);
-
-    for (int it = 0; it < 2; ++it) {
-      mapper.Retriangulate(options.mapper->Triangulation());
-      mapper.FilterPoints(options.mapper->Mapper());
-      mapper.AdjustGlobalBundle(options.mapper->Mapper(),
-                                *options.bundle_adjustment);
-    }
-
-    // BA can affect the scale, so we perform an alignment to the map poses
-    // to fix it afterwards.
     {
-      std::vector<std::string> image_names;
-      std::vector<Eigen::Vector3d> ref_image_positions;
-      for (const image_t image_id : local_image_set) {
-        const auto& im = map.Image(image_id);
-
-        image_names.emplace_back(im.Name());
-        ref_image_positions.emplace_back(im.ProjectionCenter());
+      // Loop over the images in map instead of query_pc because we change the
+      // latter in the loop.
+      for (const image_t map_image_id : map.RegImageIds()) {
+        if (local_image_set.count(map_image_id) == 0) {
+          query_rec.DeRegisterImage(map_image_id);
+        }
       }
 
-      query_rec.Align(image_names, ref_image_positions, 3);
+      IncrementalMapper mapper(&database_cache);
+      mapper.BeginReconstruction(&query_rec);
+
+      for (int it = 0; it < 2; ++it) {
+        mapper.Retriangulate(options.mapper->Triangulation());
+        mapper.FilterPoints(options.mapper->Mapper());
+        mapper.AdjustGlobalBundle(options.mapper->Mapper(),
+                                  *options.bundle_adjustment);
+      }
     }
+
+    // Also use a version of the map that does not contain the query image set
+    Reconstruction stripped_map = map;
+
+    {
+
+      std::set<point3D_t> local_point3D_ids;
+      std::set<image_t> local_map_images;
+      for (const image_t image_id : local_image_set) {
+        const Image& image = stripped_map.Image(image_id);
+        for (const auto& point2D : image.Points2D()) {
+          if (point2D.HasPoint3D()) {
+            const point3D_t point3D_id = point2D.Point3DId();
+            local_point3D_ids.emplace(point3D_id);
+
+            const Point3D& point3D = stripped_map.Point3D(point3D_id);
+            for (const auto& elem : point3D.Track().Elements()) {
+              local_map_images.emplace(elem.image_id);
+            }
+          }
+        }
+      }
+
+      // Remove query images from map
+      for (const image_t image_id : local_image_set) {
+        stripped_map.DeRegisterImage(image_id);
+      }
+
+      IncrementalMapper::Options mapper_options = options.mapper->Mapper();
+
+      stripped_map.FilterAllPoints3D(mapper_options.filter_max_reproj_error,
+                                     mapper_options.filter_min_tri_angle);
+
+      BundleAdjustmentConfig ba_config;
+      for (const point3D_t point3D_id : local_point3D_ids) {
+        if (stripped_map.ExistsPoint3D(point3D_id)) {
+          ba_config.AddVariablePoint(point3D_id);
+        }
+      }
+
+      for (const image_t image_id : local_map_images) {
+        if (stripped_map.ExistsImage(image_id)) {
+          ba_config.SetVariablePose(image_id);
+        }
+      }
+
+      BundleAdjuster bundle_adjuster(*options.bundle_adjustment, ba_config);
+      bundle_adjuster.Solve(&stripped_map);
+    }
+
+    // Align query and map to the input map again (fixes scale drift).
+    query_rec.Align(image_names, ref_image_positions, 3);
+    stripped_map.Align(image_names, ref_image_positions, 3);
 
 
     // Transform the query points into the query image space
@@ -2288,6 +2339,8 @@ int RunLocExport(int argc, char** argv) {
             "%.6f %.6f %.6f %.6f %.6f %.6f\n", query_point(0), query_point(1),
             query_point(2), map_point(0), map_point(1), map_point(2));
       }
+
+      images_stream.flush();
     }
   }
 
