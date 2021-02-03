@@ -2087,6 +2087,213 @@ int RunVocabTreeRetriever(int argc, char** argv) {
   return EXIT_SUCCESS;
 }
 
+int RunLocExport(int argc, char** argv) {
+  std::string input_path;
+  std::string export_path;
+
+  OptionManager options;
+  options.AddDatabaseOptions();
+  options.AddRequiredOption("input_path", &input_path);
+  options.AddRequiredOption("export_path", &export_path);
+  options.AddMapperOptions();
+  options.Parse(argc, argv);
+
+  if (!ExistsDir(input_path)) {
+    std::cerr << "ERROR: `input_path` is not a directory" << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  if (!ExistsDir(export_path)) {
+    std::cerr << "ERROR: `export_path` is not a directory" << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  PrintHeading1("Loading database");
+
+  DatabaseCache database_cache;
+
+  {
+    Database database(*options.database_path);
+    Timer timer;
+    timer.Start();
+    const size_t min_num_matches =
+        static_cast<size_t>(options.mapper->min_num_matches);
+    database_cache.Load(database, min_num_matches, false, {});
+    std::cout << std::endl;
+    timer.PrintMinutes();
+  }
+
+  const CorrespondenceGraph corr_graph = database_cache.CorrespondenceGraph();
+
+  // We use this to keep the original point cloud.
+  // For each image we then create a submap and run BA and retriangultion.
+  Reconstruction map;
+  map.Read(input_path);
+
+  std::string im_file_path =
+      JoinPaths(export_path, "images.txt");
+  std::ofstream images_stream(im_file_path);
+  CHECK(images_stream);
+
+  images_stream << "# image_name qw qx qy qz tx ty tz\n";
+
+  const auto map_image_ids = map.RegImageIds();
+
+  for (const image_t query_image_id : map_image_ids) {
+
+    // Find a local map of size 4
+    // We use the feature tracks of the triangulated points instead of raw
+    // feature matches to increase the chance to get a proper structure.
+
+    const auto& query_image = map.Image(query_image_id);
+
+    std::unordered_map<image_t, int> image_corrs;
+
+    for (const auto point2D : query_image.Points2D()) {
+      if (point2D.HasPoint3D()) {
+        const auto& point3D = map.Point3D(point2D.Point3DId());
+
+        for (const auto track_elem : point3D.Track().Elements()) {
+          image_corrs[track_elem.image_id] += 1;
+        }
+      }
+    }
+
+    using corr_num_pair_t = std::pair<image_t, int>;
+
+    std::vector<corr_num_pair_t> num_corrs{image_corrs.begin(), image_corrs.end()};
+
+    auto comp_fun = [](const corr_num_pair_t& lhs, const corr_num_pair_t& rhs) {
+      return lhs.second > rhs.second;
+    };
+
+    std::set<image_t> local_image_set;
+
+    if (num_corrs.size() > 4) {
+      std::partial_sort(
+          num_corrs.begin(), num_corrs.begin() + 4, num_corrs.end(), comp_fun);
+
+      local_image_set.emplace(num_corrs.at(0).first);
+      local_image_set.emplace(num_corrs.at(1).first);
+      local_image_set.emplace(num_corrs.at(2).first);
+      local_image_set.emplace(num_corrs.at(3).first);
+
+    } else if (num_corrs.size() > 1) {
+      // This is the query image and 1-2 other ones
+      std::sort(num_corrs.begin(), num_corrs.end(), comp_fun);
+      for (const auto& im_corrs : num_corrs) {
+        local_image_set.emplace(im_corrs.first);
+      }
+    } else {
+      // Only the query image is in the set
+      std::cerr << "No map correspondences available for image "
+                << query_image_id << std::endl;
+      continue;
+    }
+
+    // Create the local point cloud for querying
+    Reconstruction query_rec = map;
+
+    // Loop over the images in map instead of query_pc because we change the
+    // latter in the loop.
+    for (const image_t map_image_id : map.RegImageIds()) {
+      if (local_image_set.count(map_image_id) == 0) {
+        query_rec.DeRegisterImage(map_image_id);
+      }
+    }
+
+    IncrementalMapper mapper(&database_cache);
+    mapper.BeginReconstruction(&query_rec);
+
+    for (int it = 0; it < 2; ++it) {
+      mapper.Retriangulate(options.mapper->Triangulation());
+      mapper.FilterPoints(options.mapper->Mapper());
+      mapper.AdjustGlobalBundle(options.mapper->Mapper(),
+                                *options.bundle_adjustment);
+    }
+
+    // BA can affect the scale, so we perform an alignment to the map poses
+    // to fix it afterwards.
+    {
+      std::vector<std::string> image_names;
+      std::vector<Eigen::Vector3d> ref_image_positions;
+      for (const image_t image_id : local_image_set) {
+        const auto& im = map.Image(image_id);
+
+        image_names.emplace_back(im.Name());
+        ref_image_positions.emplace_back(im.ProjectionCenter());
+      }
+
+      query_rec.Align(image_names, ref_image_positions, 3);
+    }
+
+
+    // Transform the query points into the query image space
+    std::unordered_map<point3D_t, Eigen::Vector3d> query_points;
+    const auto& local_query_image = query_rec.Image(query_image_id);
+    Eigen::Matrix3x4d proj_matrix = local_query_image.ProjectionMatrix();
+    for (const auto& point2D : local_query_image.Points2D()) {
+      if (point2D.HasPoint3D()) {
+        const auto point3D_id = point2D.Point3DId();
+        const Eigen::Vector3d point_pos =
+            query_rec.Point3D(point3D_id).XYZ();
+        query_points.emplace(
+            point3D_id, proj_matrix * point_pos.homogeneous());
+      }
+    }
+
+    // Collect correspondences from raw feature matches
+    // Point ID in the query cloud - point ID in map
+    std::set<std::pair<point3D_t, point3D_t>> point_corrs;
+    for (point2D_t point2D_idx = 0; point2D_idx < local_query_image.NumPoints2D();
+         ++point2D_idx) {
+      const auto& point2D = local_query_image.Point2D(point2D_idx);
+      if (point2D.HasPoint3D()) {
+        const auto corrs =
+            corr_graph.FindCorrespondences(query_image_id, point2D_idx);
+
+        for (const auto& corr : corrs) {
+          const auto corr_image = map.Image(corr.image_id);
+          const auto corr_point2D = corr_image.Point2D(corr.point2D_idx);
+          if (corr_point2D.HasPoint3D()) {
+            point_corrs.emplace(point2D.Point3DId(), corr_point2D.Point3DId());
+          }
+        }
+      }
+    }
+
+    // Add image to images file
+    // `query_image' belongs to the map reconstruction, therefore we can
+    // directly use its pose.
+    const Eigen::Vector4d& qvec = query_image.Qvec();
+    const Eigen::Vector3d& tvec = query_image.Tvec();
+    images_stream << StringPrintf("%s %.6f %.6f %.6f %.6f %.6f %.6f %.6f\n",
+                                  query_image.Name().c_str(),
+                                  qvec(0), qvec(1), qvec(2), qvec(3),
+                                  tvec(0), tvec(1), tvec(2));
+
+    // Write correspondences to file
+    {
+      std::string corr_file_path =
+          JoinPaths(export_path, query_image.Name() + ".corrs");
+      std::ofstream corr_stream(corr_file_path);
+      CHECK(corr_stream);
+
+      corr_stream << "# query_point[x y z] | map_point[x y z]\n";
+
+      for (const auto& point_corr : point_corrs) {
+        const Eigen::Vector3d query_point = query_points.at(point_corr.first);
+        const Eigen::Vector3d map_point = map.Point3D(point_corr.second).XYZ();
+        corr_stream << StringPrintf(
+            "%.6f %.6f %.6f %.6f %.6f %.6f\n", query_point(0), query_point(1),
+            query_point(2), map_point(0), map_point(1), map_point(2));
+      }
+    }
+  }
+
+  return EXIT_SUCCESS;
+}
+
 typedef std::function<int(int, char**)> command_func_t;
 
 int ShowHelp(
@@ -2175,6 +2382,7 @@ int main(int argc, char** argv) {
   commands.emplace_back("vocab_tree_builder", &RunVocabTreeBuilder);
   commands.emplace_back("vocab_tree_matcher", &RunVocabTreeMatcher);
   commands.emplace_back("vocab_tree_retriever", &RunVocabTreeRetriever);
+  commands.emplace_back("loc_export", &RunLocExport);
 
   if (argc == 1) {
     return ShowHelp(commands);
